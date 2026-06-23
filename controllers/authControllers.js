@@ -6,13 +6,37 @@ import { sendToken } from "../utils/jwtToken.js";
 import { generateResetPasswordToken } from "../utils/generateResetPasswordToken.js";
 import { generateEmailTemplate } from "../utils/generateForgotPasswordEmailTemplate.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import crypto from "crypto";
+import validator from "validator";
+import { validatePassword } from "../utils/passwordValidation.js";
+import { v2 as cloudinary } from "cloudinary";
 
 export const register = catchAsyncErrors(async (req, res, next) => {
   const { name, email, password } = req.body;
+
+  // 1. Check required fields
   if (!name || !email || !password) {
     return next(new ErrorHandler("Please provide all required fields.", 400));
   }
 
+  // 2. Validate name
+  if (name.length < 2 || name.length > 50) {
+    return next(
+      new ErrorHandler("Name must be between 2 and 50 characters.", 400),
+    );
+  }
+
+  // 3. ✅ VALIDATE EMAIL WITH VALIDATOR (NO REGEX NEEDED!)
+  if (!validator.isEmail(email)) {
+    return next(new ErrorHandler("Please provide a valid email address.", 400));
+  }
+
+  const passwordErrors = validatePassword(password);
+  if (passwordErrors.length > 0) {
+    return next(new ErrorHandler(passwordErrors[0], 400));
+  }
+
+  // 5. Check if email already registered
   const isAlreadyRegistered = await database.query(
     `SELECT * FROM users WHERE email = $1`,
     [email],
@@ -24,11 +48,13 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
+  // 6. Hash password and create user
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = await database.query(
     "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
     [name, email, hashedPassword],
   );
+
   sendToken(user.rows[0], 201, "User registered successfully", res);
 });
 
@@ -80,20 +106,28 @@ export const logout = catchAsyncErrors(async (req, res, next) => {
 export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
   const { email } = req.body;
   const { frontendUrl } = req.query;
+
+  // ✅ ADD THIS CHECK
+  if (!frontendUrl) {
+    return next(new ErrorHandler("Frontend URL is required.", 400));
+  }
+
   let userResult = await database.query(
     `SELECT * FROM users WHERE email = $1`,
-    [email]
+    [email],
   );
+
   if (userResult.rows.length === 0) {
     return next(new ErrorHandler("User not found with this email.", 404));
   }
+
   const user = userResult.rows[0];
   const { hashedToken, resetPasswordExpireTime, resetToken } =
     generateResetPasswordToken();
 
   await database.query(
     `UPDATE users SET reset_password_token = $1, reset_password_expire = to_timestamp($2) WHERE email = $3`,
-    [hashedToken, resetPasswordExpireTime / 1000, email]
+    [hashedToken, resetPasswordExpireTime / 1000, email],
   );
 
   const resetPasswordUrl = `${frontendUrl}/password/reset/${resetToken}`;
@@ -113,9 +147,224 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
   } catch (error) {
     await database.query(
       `UPDATE users SET reset_password_token = NULL, reset_password_expire = NULL WHERE email = $1`,
-      [email]
+      [email],
     );
     return next(new ErrorHandler("Email could not be sent.", 500));
   }
 });
 
+export const resetPassword = catchAsyncErrors(async (req, res, next) => {
+  const { token } = req.params;
+  const resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  const user = await database.query(
+    "SELECT * FROM users WHERE reset_password_token = $1 AND reset_password_expire > NOW()",
+    [resetPasswordToken],
+  );
+
+  if (user.rows.length === 0) {
+    return next(new ErrorHandler("Invalid or expired reset token.", 400));
+  }
+
+  const { password, confirmPassword } = req.body;
+
+  // 1. Check if passwords exist
+  if (!password || !confirmPassword) {
+    return next(
+      new ErrorHandler("Both password and confirm password are required.", 400),
+    );
+  }
+
+  // 2. Check if passwords match
+  if (password !== confirmPassword) {
+    return next(new ErrorHandler("Passwords do not match.", 400));
+  }
+
+  const passwordErrors = validatePassword(password);
+  if (passwordErrors.length > 0) {
+    return next(new ErrorHandler(passwordErrors[0], 400));
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const updatedUser = await database.query(
+    `UPDATE users SET password = $1, reset_password_token = NULL, reset_password_expire = NULL WHERE id = $2 RETURNING *`,
+    [hashedPassword, user.rows[0].id],
+  );
+
+  sendToken(updatedUser.rows[0], 200, "Password reset successfully", res);
+});
+
+export const updatePassword = catchAsyncErrors(async (req, res, next) => {
+
+  const { currentPassword, newPassword, confirmNewPassword } = req.body;
+
+  if (!currentPassword || !newPassword || !confirmNewPassword) {
+    return next(new ErrorHandler("Please provide all required fields.", 400));
+  }
+
+  const isPasswordMatch = await bcrypt.compare(
+    currentPassword,
+    req.user.password,
+  );
+
+  if (!isPasswordMatch) {
+    return next(new ErrorHandler("Current password is incorrect.", 401));
+  }
+
+  if (newPassword !== confirmNewPassword) {
+    return next(new ErrorHandler("New passwords do not match.", 400));
+  }
+
+  const passwordErrors = validatePassword(newPassword);
+
+  if (passwordErrors.length > 0) {
+    return next(new ErrorHandler(passwordErrors[0], 400));
+  }
+
+  const isSamePassword = await bcrypt.compare(newPassword, req.user.password);
+  if (isSamePassword) {
+    return next(
+      new ErrorHandler(
+        "New password cannot be the same as current password.",
+        400,
+      ),
+    );
+  }
+
+  console.log("✅ Password updated successfully for user:", req.user.email);
+  console.log("   Current Password:", currentPassword);
+  console.log("   New Password:", newPassword);
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  await database.query("UPDATE users SET password = $1 WHERE id = $2", [
+    hashedPassword,
+    req.user.id,
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: "Password updated successfully.",
+  });
+});
+
+
+export const updateProfile = catchAsyncErrors(async (req, res, next) => {
+  const { name, email } = req.body;
+
+  // 1. Check if fields are provided
+  if (!name || !email) {
+    return next(new ErrorHandler("Please provide all required fields.", 400));
+  }
+
+  // 2. Trim whitespace
+  const trimmedName = name.trim();
+  const trimmedEmail = email.trim();
+
+  if (trimmedName.length === 0 || trimmedEmail.length === 0) {
+    return next(new ErrorHandler("Name and email cannot be empty.", 400));
+  }
+
+  // 3. Validate name length
+  if (trimmedName.length < 2 || trimmedName.length > 50) {
+    return next(
+      new ErrorHandler("Name must be between 2 and 50 characters.", 400)
+    );
+  }
+
+  // 4. Validate email format
+  if (!validator.isEmail(trimmedEmail)) {
+    return next(new ErrorHandler("Please provide a valid email address.", 400));
+  }
+
+  // 5. Check if email is already taken by another user
+  const emailExists = await database.query(
+    "SELECT id FROM users WHERE email = $1 AND id != $2",
+    [trimmedEmail, req.user.id]
+  );
+
+  if (emailExists.rows.length > 0) {
+    return next(
+      new ErrorHandler("Email is already registered by another user.", 400)
+    );
+  }
+
+  // 6. Handle avatar upload
+  let avatarData = {};
+  if (req.files && req.files.avatar) {
+    const { avatar } = req.files;
+
+    // ✅ Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(avatar.mimetype)) {
+      return next(
+        new ErrorHandler("Please upload a valid image file (JPEG, PNG, WEBP).", 400)
+      );
+    }
+
+    // ✅ Validate file size (max 600KB)
+    const maxSize = 600 * 1024; // 600KB
+    if (avatar.size > maxSize) {
+      return next(
+        new ErrorHandler("Image size must be less than 2MB.", 400)
+      );
+    }
+
+    // Delete old avatar if exists
+    if (req.user?.avatar?.public_id) {
+      try {
+        await cloudinary.uploader.destroy(req.user.avatar.public_id);
+      } catch (error) {
+        console.error("Error deleting old avatar:", error);
+      }
+    }
+
+    // Upload new avatar
+    try {
+      const newProfileImage = await cloudinary.uploader.upload(
+        avatar.tempFilePath,
+        {
+          folder: "ShopSmart-AI Avatars",
+          width: 150,
+          height: 150,
+          crop: "scale",
+        }
+      );
+      avatarData = {
+        public_id: newProfileImage.public_id,
+        url: newProfileImage.secure_url,
+      };
+    } catch (error) {
+      return next(
+        new ErrorHandler("Failed to upload avatar. Please try again.", 500)
+      );
+    }
+  }
+
+  // 7. Update user in database
+  let user;
+  const hasAvatar = Object.keys(avatarData).length > 0;
+
+  if (!hasAvatar) {
+    user = await database.query(
+      "UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *",
+      [trimmedName, trimmedEmail, req.user.id]
+    );
+  } else {
+    user = await database.query(
+      "UPDATE users SET name = $1, email = $2, avatar = $3 WHERE id = $4 RETURNING *",
+      [trimmedName, trimmedEmail, avatarData, req.user.id]
+    );
+  }
+
+  // 8. Send response
+  res.status(200).json({
+    success: true,
+    message: "Profile updated successfully.",
+    user: user.rows[0],
+  });
+});

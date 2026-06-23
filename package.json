@@ -10,7 +10,8 @@
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^9.0.1",
     "pg": "^8.22.0",
-    "stripe": "^22.2.2"
+    "stripe": "^22.2.2",
+    "validator": "^13.15.35"
   },
   "name": "shopsmart-ai",
   "version": "1.0.0",
@@ -32,6 +33,5 @@
   "bugs": {
     "url": "https://github.com/sachinkrjha23/ShopSmart-AI/issues"
   },
-  "homepage": "https://github.com/sachinkrjha23/ShopSmart-AI#readme",
-  "devDependencies": {}
+  "homepage": "https://github.com/sachinkrjha23/ShopSmart-AI#readme"
 }
