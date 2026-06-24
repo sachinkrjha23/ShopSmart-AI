@@ -5,7 +5,7 @@ export async function createProductsTable() {
     const query = ` 
         CREATE TABLE IF NOT EXISTS products ( 
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-            name VARCHAR(255) NOT NULL, 
+            name VARCHAR(255) NOT NULL UNIQUE, 
             description TEXT NOT NULL, 
             price DECIMAL(10,2) NOT NULL CHECK (price >= 0), 
             category VARCHAR(100) NOT NULL, 
