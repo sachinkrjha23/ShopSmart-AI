@@ -107,6 +107,11 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
   const { email } = req.body;
   const { frontendUrl } = req.query;
 
+  // ✅ Validate email format
+  if (!email || !validator.isEmail(email)) {
+    return next(new ErrorHandler("Please provide a valid email address.", 400));
+  }
+
   // ✅ ADD THIS CHECK
   if (!frontendUrl) {
     return next(new ErrorHandler("Frontend URL is required.", 400));
