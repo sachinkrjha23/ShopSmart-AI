@@ -4,7 +4,6 @@ import ErrorHandler from "./errorMiddleware.js";
 import database from "../database/db.js";
 
 export const isAuthenticated = catchAsyncErrors(async (req, res, next) => {
-
   const { token } = req.cookies;
 
   if (!token) {
@@ -14,18 +13,20 @@ export const isAuthenticated = catchAsyncErrors(async (req, res, next) => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
 
   const user = await database.query(
-    "SELECT * FROM users WHERE id = $1 LIMIT 1", [decoded.id],
+    "SELECT * FROM users WHERE id = $1 LIMIT 1",
+    [decoded.id],
   );
+
+  if (!user.rows[0]) {
+    return next(new ErrorHandler("User not found. Please login again.", 404));
+  }
 
   req.user = user.rows[0];
   next();
-
 });
 
 export const authorizedRoles = (...roles) => {
-
   return (req, res, next) => {
-
     if (!roles.includes(req.user.role)) {
       return next(
         new ErrorHandler(
@@ -34,8 +35,7 @@ export const authorizedRoles = (...roles) => {
         ),
       );
     }
-    
+
     next();
-    
   };
 };

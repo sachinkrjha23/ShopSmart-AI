@@ -8,7 +8,7 @@ export async function createProductReviewsTable() {
         product_id UUID NOT NULL,
         user_id UUID NOT NULL,
         rating DECIMAL(3,2) NOT NULL CHECK (rating BETWEEN 0 AND 5),
-        comment TEXT NOT NULL,
+        comment TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

@@ -1,5 +1,5 @@
 import express from "express";
-import { createProduct , fetchAllProducts, updateProduct, deleteProduct, fetchSingleProduct, postProductReview, deleteReview /*, fetchAIFilteredProducts */ } from "../controllers/productControllers.js";
+import { createProduct , fetchAllProducts, updateProduct, deleteProduct, fetchSingleProduct, postProductReview, deleteReview , fetchAIFilteredProducts  } from "../controllers/productControllers.js";
 
 import { authorizedRoles, isAuthenticated} from "../middlewares/authMiddleware.js";
 
@@ -19,6 +19,7 @@ router.put("/post-new/review/:productId", isAuthenticated, postProductReview);
 
 router.delete("/delete/review/:productId", isAuthenticated, deleteReview);
 
+router.post("/ai/recommend", isAuthenticated, fetchAIFilteredProducts);
 
 
 export default router;

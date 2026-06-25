@@ -7,9 +7,16 @@ cloudinary.config({
     api_secret : process.env.CLOUDINARY_CLIENT_SECRET
 });
 
+const PORT = process.env.PORT || 5000;
 
 
-app.listen(process.env.PORT, ()=>{
-    console.log(`Server running on Port No.: ${process.env.PORT}`);
+const server = app.listen(PORT, ()=>{
+    console.log(`Server running on Port No.: ${PORT}`);
 });
 
+server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use.`);
+        process.exit(1);
+    }
+});

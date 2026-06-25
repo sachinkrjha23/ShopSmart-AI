@@ -204,7 +204,6 @@ export const resetPassword = catchAsyncErrors(async (req, res, next) => {
 });
 
 export const updatePassword = catchAsyncErrors(async (req, res, next) => {
-
   const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
   if (!currentPassword || !newPassword || !confirmNewPassword) {
@@ -241,8 +240,6 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
   }
 
   console.log("✅ Password updated successfully for user:", req.user.email);
-  console.log("   Current Password:", currentPassword);
-  console.log("   New Password:", newPassword);
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
 
@@ -257,16 +254,20 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-
 export const updateProfile = catchAsyncErrors(async (req, res, next) => {
-  const { name, email } = req.body;
+  const { name, email, removeAvatar } = req.body;
+  
+  // 1. Validate user exists
+  if (!req.user?.id) {
+    return next(new ErrorHandler("User not authenticated.", 401));
+  }
 
-  // 1. Check if fields are provided
+  // 2. Validate required fields
   if (!name || !email) {
     return next(new ErrorHandler("Please provide all required fields.", 400));
   }
 
-  // 2. Trim whitespace
+  // 3. Trim and validate
   const trimmedName = name.trim();
   const trimmedEmail = email.trim();
 
@@ -274,102 +275,185 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Name and email cannot be empty.", 400));
   }
 
-  // 3. Validate name length
   if (trimmedName.length < 2 || trimmedName.length > 50) {
     return next(
-      new ErrorHandler("Name must be between 2 and 50 characters.", 400)
+      new ErrorHandler("Name must be between 2 and 50 characters.", 400),
     );
   }
 
-  // 4. Validate email format
   if (!validator.isEmail(trimmedEmail)) {
     return next(new ErrorHandler("Please provide a valid email address.", 400));
   }
 
-  // 5. Check if email is already taken by another user
+  // 4. Check if email is taken by another user
   const emailExists = await database.query(
     "SELECT id FROM users WHERE email = $1 AND id != $2",
-    [trimmedEmail, req.user.id]
+    [trimmedEmail, req.user.id],
   );
 
   if (emailExists.rows.length > 0) {
     return next(
-      new ErrorHandler("Email is already registered by another user.", 400)
+      new ErrorHandler("Email is already registered by another user.", 400),
     );
   }
 
-  // 6. Handle avatar upload
-  let avatarData = {};
-  if (req.files && req.files.avatar) {
+  // 5. Handle avatar operations
+  const shouldRemoveAvatar = removeAvatar === 'true' || removeAvatar === true;
+  const hasNewAvatar = req.files?.avatar;
+  let newAvatarData = null; // null = no change, 'remove' = remove, object = new avatar
+
+  // 5a. Validate new avatar if present
+  if (hasNewAvatar) {
     const { avatar } = req.files;
 
-    // ✅ Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
     if (!allowedTypes.includes(avatar.mimetype)) {
       return next(
-        new ErrorHandler("Please upload a valid image file (JPEG, PNG, WEBP).", 400)
+        new ErrorHandler(
+          "Please upload a valid image file (JPEG, PNG, WEBP).",
+          400,
+        ),
       );
     }
 
-    // ✅ Validate file size (max 600KB)
-    const maxSize = 600 * 1024; // 600KB
+    const maxSize = 600 * 1024;
     if (avatar.size > maxSize) {
-      return next(
-        new ErrorHandler("Image size must be less than 2MB.", 400)
-      );
+      return next(new ErrorHandler("Image size must be less than 600KB.", 400));
+    }
+  }
+
+  // 6. Perform database update with transaction
+  const client = await database.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    let user;
+    let oldAvatarPublicId = req.user?.avatar?.public_id || null;
+
+    // 6a. Upload new avatar if provided (outside transaction but before DB update)
+    if (hasNewAvatar) {
+      try {
+        const { avatar } = req.files;
+        const newProfileImage = await cloudinary.uploader.upload(
+          avatar.tempFilePath,
+          {
+            folder: "ShopSmart-AI Avatars",
+            width: 150,
+            height: 150,
+            crop: "scale",
+          },
+        );
+        
+        newAvatarData = {
+          public_id: newProfileImage.public_id,
+          url: newProfileImage.secure_url,
+        };
+        
+        console.log(`✅ Avatar uploaded: ${newProfileImage.public_id}`);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        return next(
+          new ErrorHandler("Failed to upload avatar. Please try again.", 500),
+        );
+      }
     }
 
-    // Delete old avatar if exists
-    if (req.user?.avatar?.public_id) {
+    // 6b. Determine avatar operation for DB
+    let avatarOperation;
+    if (shouldRemoveAvatar) {
+      avatarOperation = 'REMOVE';
+    } else if (newAvatarData) {
+      avatarOperation = 'UPDATE';
+    } else {
+      avatarOperation = 'KEEP';
+    }
+
+    // 6c. Update database
+    let query, params;
+    
+    switch (avatarOperation) {
+      case 'REMOVE':
+        query = `
+          UPDATE users 
+          SET name = $1, email = $2, avatar = NULL 
+          WHERE id = $3 
+          RETURNING *
+        `;
+        params = [trimmedName, trimmedEmail, req.user.id];
+        break;
+        
+      case 'UPDATE':
+        query = `
+          UPDATE users 
+          SET name = $1, email = $2, avatar = $3 
+          WHERE id = $4 
+          RETURNING *
+        `;
+        params = [trimmedName, trimmedEmail, newAvatarData, req.user.id];
+        break;
+        
+      case 'KEEP':
+      default:
+        query = `
+          UPDATE users 
+          SET name = $1, email = $2 
+          WHERE id = $3 
+          RETURNING *
+        `;
+        params = [trimmedName, trimmedEmail, req.user.id];
+        break;
+    }
+
+    const result = await client.query(query, params);
+    user = result.rows[0];
+
+    if (!user) {
+      await client.query('ROLLBACK');
+      return next(new ErrorHandler("User not found.", 404));
+    }
+
+    await client.query('COMMIT');
+
+    // 7. Clean up old avatar files (after successful transaction)
+    if (shouldRemoveAvatar && oldAvatarPublicId) {
       try {
-        await cloudinary.uploader.destroy(req.user.avatar.public_id);
+        await cloudinary.uploader.destroy(oldAvatarPublicId);
+        console.log(`✅ Avatar deleted: ${oldAvatarPublicId}`);
+      } catch (error) {
+        console.error("Error deleting avatar:", error);
+      }
+    } else if (newAvatarData && oldAvatarPublicId) {
+      try {
+        await cloudinary.uploader.destroy(oldAvatarPublicId);
+        console.log(`✅ Old avatar deleted: ${oldAvatarPublicId}`);
       } catch (error) {
         console.error("Error deleting old avatar:", error);
       }
     }
 
-    // Upload new avatar
-    try {
-      const newProfileImage = await cloudinary.uploader.upload(
-        avatar.tempFilePath,
-        {
-          folder: "ShopSmart-AI Avatars",
-          width: 150,
-          height: 150,
-          crop: "scale",
-        }
-      );
-      avatarData = {
-        public_id: newProfileImage.public_id,
-        url: newProfileImage.secure_url,
-      };
-    } catch (error) {
-      return next(
-        new ErrorHandler("Failed to upload avatar. Please try again.", 500)
-      );
+    // 8. Send response
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      user: user,
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    
+    // Clean up newly uploaded avatar if transaction failed
+    if (newAvatarData) {
+      try {
+        await cloudinary.uploader.destroy(newAvatarData.public_id);
+        console.log(`✅ Cleaned up uploaded avatar: ${newAvatarData.public_id}`);
+      } catch (cleanupError) {
+        console.error("Error cleaning up avatar:", cleanupError);
+      }
     }
+    
+    throw error; 
+  } finally {
+    client.release();
   }
-
-  // 7. Update user in database
-  let user;
-  const hasAvatar = Object.keys(avatarData).length > 0;
-
-  if (!hasAvatar) {
-    user = await database.query(
-      "UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *",
-      [trimmedName, trimmedEmail, req.user.id]
-    );
-  } else {
-    user = await database.query(
-      "UPDATE users SET name = $1, email = $2, avatar = $3 WHERE id = $4 RETURNING *",
-      [trimmedName, trimmedEmail, avatarData, req.user.id]
-    );
-  }
-
-  // 8. Send response
-  res.status(200).json({
-    success: true,
-    message: "Profile updated successfully.",
-    user: user.rows[0],
-  });
 });
