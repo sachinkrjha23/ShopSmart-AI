@@ -239,8 +239,6 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  console.log("✅ Password updated successfully for user:", req.user.email);
-
   const hashedPassword = await bcrypt.hash(newPassword, 10);
 
   await database.query("UPDATE users SET password = $1 WHERE id = $2", [
