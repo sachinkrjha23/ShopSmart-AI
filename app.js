@@ -8,20 +8,23 @@ import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 import  authRouter from "./router/authRoutes.js";
 import productRouter from "./router/productRoutes.js";
 import adminRouter from "./router/adminRoutes.js";
+import paymentRouter from "./router/paymentRoutes.js"; 
 
 
 const app = express();
 
 config({path: "./config/config.env"});
 
+app.use(cookieParser());
 app.use(cors({
     origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
 }))
 
+app.use("/api/v1/payment", paymentRouter); 
+
 app.use(express.json());
-app.use(cookieParser());
 app.use(express.urlencoded({extended: true}));
 
 app.use(

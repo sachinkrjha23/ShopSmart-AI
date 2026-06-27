@@ -22,6 +22,18 @@ export const createTables = async() =>{
         await createOrderItemTable();
         await createShippingInfoTable();
         await createPaymentsTable();
+
+        await database.query(`
+            CREATE TABLE IF NOT EXISTS webhook_logs (
+                id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                event        VARCHAR(100) NOT NULL,
+                payload      JSONB NOT NULL,
+                signature    TEXT,
+                verified     BOOLEAN DEFAULT FALSE,
+                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         console.log("All tables created successfully");
     }
     catch(error)
