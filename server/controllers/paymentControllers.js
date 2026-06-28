@@ -520,148 +520,7 @@ export const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-// 6. ADMIN — GET ALL ORDERS
-export const adminGetAllOrders = catchAsyncErrors(async (req, res, next) => {
-  const { rows: orders } = await database.query(
-    `SELECT
-       o.id, o.total_price, o.order_status, o.paid_at, o.created_at,
-       u.name AS buyer_name, u.email AS buyer_email,
-       p.payment_status, p.payment_method,
-       s.city, s.state, s.phone
-     FROM orders o
-     LEFT JOIN users         u  ON u.id = o.buyer_id
-     LEFT JOIN payments      p  ON p.order_id = o.id
-     LEFT JOIN shipping_info s  ON s.order_id = o.id
-     ORDER BY o.created_at DESC`,
-  );
-
-  res.status(200).json({
-    success: true,
-    totalOrders: orders.length,
-    orders,
-  });
-});
-
-// 7. ADMIN — UPDATE ORDER STATUS
-export const adminUpdateOrderStatus = catchAsyncErrors(
-  async (req, res, next) => {
-    const { orderId } = req.params;
-
-    if (!isValidUUID(orderId)) {
-      return next(new ErrorHandler("Invalid order ID.", 400));
-    }
-
-    const { status } = req.body;
-
-    const validStatuses = ["Processing", "Shipped", "Delivered", "Cancelled"];
-    if (!validStatuses.includes(status)) {
-      return next(
-        new ErrorHandler(
-          `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
-          400,
-        ),
-      );
-    }
-
-    const { rows } = await database.query(
-      `UPDATE orders
-     SET order_status = $1
-     WHERE id = $2
-     RETURNING *`,
-      [status, orderId],
-    );
-
-    if (rows.length === 0) {
-      return next(new ErrorHandler("Order not found.", 404));
-    }
-
-    res.status(200).json({
-      success: true,
-      message: `Order status updated to "${status}".`,
-      order: rows[0],
-    });
-  },
-);
-
-// 8. ADMIN — INITIATE REFUND
-export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
-  const client = await database.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const { orderId, amount } = req.body;
-
-    if (!orderId) {
-      return next(new ErrorHandler("Order ID is required.", 400));
-    }
-
-    if (!isValidUUID(orderId)) {
-      return next(new ErrorHandler("Invalid order ID.", 400));
-    }
-
-    const { rows } = await client.query(
-      `SELECT p.razorpay_payment_id, p.payment_status, o.total_price
-       FROM payments p
-       JOIN orders o ON o.id = p.order_id
-       WHERE p.order_id = $1`,
-      [orderId],
-    );
-
-    if (rows.length === 0) {
-      return next(new ErrorHandler("Payment record not found.", 404));
-    }
-
-    const { razorpay_payment_id, payment_status, total_price } = rows[0];
-
-    if (payment_status === "Refunded") {
-      return next(
-        new ErrorHandler("This order has already been refunded.", 400),
-      );
-    }
-
-    if (payment_status !== "Paid") {
-      return next(new ErrorHandler("Only paid orders can be refunded.", 400));
-    }
-
-    if (!razorpay_payment_id) {
-      return next(
-        new ErrorHandler("No Razorpay payment ID found for this order.", 400),
-      );
-    }
-
-    const refundAmountPaise = amount ? toPaise(amount) : toPaise(total_price); // full refund if no amount given
-
-    const refund = await razorpay.payments.refund(razorpay_payment_id, {
-      amount: refundAmountPaise,
-      notes: { orderId, reason: "Admin initiated refund" },
-    });
-
-    // Webhook will confirm, but optimistically update DB
-    await client.query(
-      `UPDATE payments
-       SET payment_status = 'Refunded', updated_at = CURRENT_TIMESTAMP
-       WHERE order_id = $1`,
-      [orderId],
-    );
-
-    await client.query("COMMIT");
-
-    res.status(200).json({
-      success: true,
-      message: "Refund initiated successfully.",
-      refundId: refund.id,
-      amount: (refundAmountPaise / 100).toFixed(2),
-    });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    return next(new ErrorHandler(error.message || "Refund failed.", 500));
-  } finally {
-    client.release();
-  }
-});
-
-// 9. USER — CANCEL ORDER
+// 6. USER — CANCEL ORDER
 // User can only cancel if order is still 'Processing'
 export const cancelOrder = catchAsyncErrors(async (req, res, next) => {
   const client = await database.connect();
@@ -765,6 +624,147 @@ export const cancelOrder = catchAsyncErrors(async (req, res, next) => {
     return next(
       new ErrorHandler(error.message || "Order cancellation failed.", 500),
     );
+  } finally {
+    client.release();
+  }
+});
+
+// 7. ADMIN — GET ALL ORDERS
+export const adminGetAllOrders = catchAsyncErrors(async (req, res, next) => {
+  const { rows: orders } = await database.query(
+    `SELECT
+       o.id, o.total_price, o.order_status, o.paid_at, o.created_at,
+       u.name AS buyer_name, u.email AS buyer_email,
+       p.payment_status, p.payment_method,
+       s.city, s.state, s.phone
+     FROM orders o
+     LEFT JOIN users         u  ON u.id = o.buyer_id
+     LEFT JOIN payments      p  ON p.order_id = o.id
+     LEFT JOIN shipping_info s  ON s.order_id = o.id
+     ORDER BY o.created_at DESC`,
+  );
+
+  res.status(200).json({
+    success: true,
+    totalOrders: orders.length,
+    orders,
+  });
+});
+
+// 8. ADMIN — UPDATE ORDER STATUS
+export const adminUpdateOrderStatus = catchAsyncErrors(
+  async (req, res, next) => {
+    const { orderId } = req.params;
+
+    if (!isValidUUID(orderId)) {
+      return next(new ErrorHandler("Invalid order ID.", 400));
+    }
+
+    const { status } = req.body;
+
+    const validStatuses = ["Processing", "Shipped", "Delivered", "Cancelled"];
+    if (!validStatuses.includes(status)) {
+      return next(
+        new ErrorHandler(
+          `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+          400,
+        ),
+      );
+    }
+
+    const { rows } = await database.query(
+      `UPDATE orders
+     SET order_status = $1
+     WHERE id = $2
+     RETURNING *`,
+      [status, orderId],
+    );
+
+    if (rows.length === 0) {
+      return next(new ErrorHandler("Order not found.", 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Order status updated to "${status}".`,
+      order: rows[0],
+    });
+  },
+);
+
+// 9. ADMIN — INITIATE REFUND
+export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
+  const client = await database.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { orderId, amount } = req.body;
+
+    if (!orderId) {
+      return next(new ErrorHandler("Order ID is required.", 400));
+    }
+
+    if (!isValidUUID(orderId)) {
+      return next(new ErrorHandler("Invalid order ID.", 400));
+    }
+
+    const { rows } = await client.query(
+      `SELECT p.razorpay_payment_id, p.payment_status, o.total_price
+       FROM payments p
+       JOIN orders o ON o.id = p.order_id
+       WHERE p.order_id = $1`,
+      [orderId],
+    );
+
+    if (rows.length === 0) {
+      return next(new ErrorHandler("Payment record not found.", 404));
+    }
+
+    const { razorpay_payment_id, payment_status, total_price } = rows[0];
+
+    if (payment_status === "Refunded") {
+      return next(
+        new ErrorHandler("This order has already been refunded.", 400),
+      );
+    }
+
+    if (payment_status !== "Paid") {
+      return next(new ErrorHandler("Only paid orders can be refunded.", 400));
+    }
+
+    if (!razorpay_payment_id) {
+      return next(
+        new ErrorHandler("No Razorpay payment ID found for this order.", 400),
+      );
+    }
+
+    const refundAmountPaise = amount ? toPaise(amount) : toPaise(total_price); // full refund if no amount given
+
+    const refund = await razorpay.payments.refund(razorpay_payment_id, {
+      amount: refundAmountPaise,
+      notes: { orderId, reason: "Admin initiated refund" },
+    });
+
+    // Webhook will confirm, but optimistically update DB
+    await client.query(
+      `UPDATE payments
+       SET payment_status = 'Refunded', updated_at = CURRENT_TIMESTAMP
+       WHERE order_id = $1`,
+      [orderId],
+    );
+
+    await client.query("COMMIT");
+
+    res.status(200).json({
+      success: true,
+      message: "Refund initiated successfully.",
+      refundId: refund.id,
+      amount: (refundAmountPaise / 100).toFixed(2),
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    return next(new ErrorHandler(error.message || "Refund failed.", 500));
   } finally {
     client.release();
   }

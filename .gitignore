@@ -1,6 +1,28 @@
+# Node modules
 node_modules/
+server/node_modules/
+client/node_modules/
+
+# Environment variables
 config/config.env
-.env
+server/config/config.env
+
+# Logs
 *.log
-uploads
+
+# Uploads
+uploads/
+server/uploads/
+
+# Cloudflare
 cloudflared.exe
+server/cloudflared.exe
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build files
+dist/
+build/
+*.min.js
