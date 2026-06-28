@@ -347,8 +347,6 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
           public_id: newProfileImage.public_id,
           url: newProfileImage.secure_url,
         };
-        
-        console.log(`✅ Avatar uploaded: ${newProfileImage.public_id}`);
       } catch (error) {
         await client.query('ROLLBACK');
         return next(

@@ -322,6 +322,7 @@ export const verifyPayment = catchAsyncErrors(async (req, res, next) => {
 // 3. WEBHOOK — called by Razorpay servers directly
 export const handleWebhook = async (req, res) => {
   const client = await database.connect();
+  let transactionStarted = false; // ✅ Track if transaction is active
 
   try {
     // Verify webhook signature
@@ -344,7 +345,6 @@ export const handleWebhook = async (req, res) => {
     console.log(`📦 Razorpay webhook received: ${event}`);
 
     switch (event) {
-      // payment.captured
       case "payment.captured": {
         const payment = payload.payload.payment.entity;
         const razorpayOrderId = payment.order_id;
@@ -352,8 +352,9 @@ export const handleWebhook = async (req, res) => {
         const method = payment.method;
 
         await client.query("BEGIN");
+        transactionStarted = true; // ✅ Transaction started
 
-        await client.query(
+        const paymentUpdate = await client.query(
           `UPDATE payments
            SET razorpay_payment_id  = $1,
                payment_status       = 'Paid',
@@ -361,9 +362,17 @@ export const handleWebhook = async (req, res) => {
                webhook_verified     = TRUE,
                raw_webhook_payload  = $3,
                updated_at           = CURRENT_TIMESTAMP
-           WHERE razorpay_order_id  = $4`,
+           WHERE razorpay_order_id  = $4
+           RETURNING order_id`,
           [razorpayPayId, method, JSON.stringify(payload), razorpayOrderId],
         );
+
+        // ✅ Check if payment was updated
+        if (paymentUpdate.rows.length === 0) {
+          throw new Error(`Payment record not found for order: ${razorpayOrderId}`);
+        }
+
+        const orderId = paymentUpdate.rows[0].order_id;
 
         // Also ensure order is marked paid (belt + suspenders with verifyPayment)
         await client.query(
@@ -377,16 +386,17 @@ export const handleWebhook = async (req, res) => {
         );
 
         await client.query("COMMIT");
+        transactionStarted = false; // ✅ Transaction completed
         console.log(`✅ payment.captured → ${razorpayPayId}`);
         break;
       }
 
-      // payment.failed
       case "payment.failed": {
         const payment = payload.payload.payment.entity;
         const razorpayOrderId = payment.order_id;
 
         await client.query("BEGIN");
+        transactionStarted = true; // ✅ Transaction started
 
         await client.query(
           `UPDATE payments
@@ -398,16 +408,17 @@ export const handleWebhook = async (req, res) => {
         );
 
         await client.query("COMMIT");
+        transactionStarted = false; // ✅ Transaction completed
         console.log(`❌ payment.failed → order ${razorpayOrderId}`);
         break;
       }
 
-      // refund.processed
       case "refund.processed": {
         const refund = payload.payload.refund.entity;
         const razorpayPayId = refund.payment_id;
 
         await client.query("BEGIN");
+        transactionStarted = true; // ✅ Transaction started
 
         await client.query(
           `UPDATE payments
@@ -419,6 +430,7 @@ export const handleWebhook = async (req, res) => {
         );
 
         await client.query("COMMIT");
+        transactionStarted = false; // ✅ Transaction completed
         console.log(`💰 refund.processed → payment ${razorpayPayId}`);
         break;
       }
@@ -429,13 +441,25 @@ export const handleWebhook = async (req, res) => {
 
     // Always respond 200 quickly — Razorpay retries if you don't
     return res.status(200).json({ received: true });
+    
   } catch (error) {
-    await client.query("ROLLBACK").catch(() => {});
+    // ✅ FIX: Only rollback if transaction was started
+    if (transactionStarted) {
+      try {
+        await client.query("ROLLBACK");
+        console.log("🔄 Webhook transaction rolled back");
+      } catch (rollbackError) {
+        console.error("❌ Failed to rollback transaction:", rollbackError.message);
+      }
+    }
+    
     console.error("❌ Webhook processing error:", error.message);
     // Return 200 anyway so Razorpay doesn't retry a legitimate event
-    return res
-      .status(200)
-      .json({ received: true, warning: "Internal processing error." });
+    return res.status(200).json({ 
+      received: true, 
+      warning: "Internal processing error." 
+    });
+    
   } finally {
     client.release();
   }
