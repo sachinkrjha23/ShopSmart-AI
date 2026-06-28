@@ -256,6 +256,7 @@ export const handleWebhook = async (req, res) => {
       .update(rawBody)
       .digest("hex");
 
+
     if (expectedSig !== receivedSig) {
       console.warn("⚠️  Invalid webhook signature — rejected");
       return res.status(400).json({ error: "Invalid webhook signature." });
