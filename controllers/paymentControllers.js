@@ -4,6 +4,9 @@ import database from "../database/db.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
 
+const isValidUUID = (id) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_FRONTEND_KEY,
   key_secret: process.env.RAZORPAY_SECRET_KEY,
@@ -26,8 +29,63 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("Cart is empty.", 400));
     }
 
+    if (cartItems.length > 20) {
+      return next(
+        new ErrorHandler("Maximum 20 different items per order.", 400),
+      );
+    }
+
+    // Validate each cart item
+    for (const item of cartItems) {
+      if (!item.productId) {
+        return next(new ErrorHandler("Invalid product ID in cart.", 400));
+      }
+      if (
+        !Number.isInteger(Number(item.quantity)) ||
+        Number(item.quantity) <= 0
+      ) {
+        return next(
+          new ErrorHandler("Quantity must be a positive number.", 400),
+        );
+      }
+      if (Number(item.quantity) > 100) {
+        return next(new ErrorHandler("Maximum 100 quantity per product.", 400));
+      }
+    }
+
     if (!shippingInfo) {
       return next(new ErrorHandler("Shipping information is required.", 400));
+    }
+
+    const { full_name, state, city, country, address, pincode, phone } =
+      shippingInfo;
+
+    if (
+      !full_name ||
+      !state ||
+      !city ||
+      !country ||
+      !address ||
+      !pincode ||
+      !phone
+    ) {
+      return next(new ErrorHandler("All shipping fields are required.", 400));
+    }
+    if (!/^\d{10}$/.test(phone)) {
+      return next(
+        new ErrorHandler("Invalid phone number. Must be 10 digits.", 400),
+      );
+    }
+    if (!/^\d{6}$/.test(pincode)) {
+      return next(new ErrorHandler("Invalid pincode. Must be 6 digits.", 400));
+    }
+    if (full_name.trim().length < 2 || full_name.trim().length > 100) {
+      return next(
+        new ErrorHandler(
+          "Full name must be between 2 and 100 characters.",
+          400,
+        ),
+      );
     }
 
     // Fetch real prices from DB
@@ -75,6 +133,19 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
     const shippingPrice = itemsPrice > 500 ? 0 : 50;
     const totalPrice = Math.round((itemsPrice + shippingPrice) * 100) / 100;
 
+    // Amount validation
+    if (totalPrice <= 0) {
+      return next(new ErrorHandler("Invalid order amount.", 400));
+    }
+    if (totalPrice > 500000) {
+      return next(
+        new ErrorHandler(
+          "Order amount exceeds maximum limit of ₹5,00,000.",
+          400,
+        ),
+      );
+    }
+
     // Insert order
     const {
       rows: [order],
@@ -101,14 +172,19 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       );
     }
 
-    // Insert shipping info
-    const { full_name, state, city, country, address, pincode, phone } =
-      shippingInfo;
-
     await client.query(
       `INSERT INTO shipping_info (order_id, full_name, state, city, country, address, pincode, phone)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [order.id, full_name, state, city, country, address, pincode, phone],
+      [
+        order.id,
+        full_name.trim(),
+        state.trim(),
+        city.trim(),
+        country.trim(),
+        address.trim(),
+        pincode.trim(),
+        phone.trim(),
+      ],
     );
 
     // Create Razorpay order
@@ -141,10 +217,11 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
     });
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("CREATE ORDER ERROR:", error); // ← add this
     return next(
       new ErrorHandler(error.message || "Order creation failed.", 500),
     );
+  } finally {
+    client.release();
   }
 });
 
@@ -255,7 +332,6 @@ export const handleWebhook = async (req, res) => {
       .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET)
       .update(rawBody)
       .digest("hex");
-
 
     if (expectedSig !== receivedSig) {
       console.warn("⚠️  Invalid webhook signature — rejected");
@@ -403,6 +479,11 @@ export const getMyOrders = catchAsyncErrors(async (req, res, next) => {
 // 5. GET SINGLE ORDER
 export const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
   const { orderId } = req.params;
+
+  if (!isValidUUID(orderId)) {
+    return next(new ErrorHandler("Invalid order ID.", 400));
+  }
+
   const buyerId = req.user.id;
 
   const { rows } = await database.query(
@@ -465,6 +546,11 @@ export const adminGetAllOrders = catchAsyncErrors(async (req, res, next) => {
 export const adminUpdateOrderStatus = catchAsyncErrors(
   async (req, res, next) => {
     const { orderId } = req.params;
+
+    if (!isValidUUID(orderId)) {
+      return next(new ErrorHandler("Invalid order ID.", 400));
+    }
+
     const { status } = req.body;
 
     const validStatuses = ["Processing", "Shipped", "Delivered", "Cancelled"];
@@ -508,6 +594,10 @@ export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
 
     if (!orderId) {
       return next(new ErrorHandler("Order ID is required.", 400));
+    }
+
+    if (!isValidUUID(orderId)) {
+      return next(new ErrorHandler("Invalid order ID.", 400));
     }
 
     const { rows } = await client.query(
@@ -565,7 +655,6 @@ export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
     });
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("REFUND ERROR:", error);
     return next(new ErrorHandler(error.message || "Refund failed.", 500));
   } finally {
     client.release();
@@ -581,15 +670,20 @@ export const cancelOrder = catchAsyncErrors(async (req, res, next) => {
     await client.query("BEGIN");
 
     const { orderId } = req.params;
-    const buyerId     = req.user.id;
 
-    // Check order exists and belongs to this user 
+    if (!isValidUUID(orderId)) {
+      return next(new ErrorHandler("Invalid order ID.", 400));
+    }
+
+    const buyerId = req.user.id;
+
+    // Check order exists and belongs to this user
     const { rows } = await client.query(
       `SELECT o.*, p.payment_status, p.razorpay_payment_id
        FROM orders o
        LEFT JOIN payments p ON p.order_id = o.id
        WHERE o.id = $1 AND o.buyer_id = $2`,
-      [orderId, buyerId]
+      [orderId, buyerId],
     );
 
     if (rows.length === 0) {
@@ -603,32 +697,32 @@ export const cancelOrder = catchAsyncErrors(async (req, res, next) => {
       return next(
         new ErrorHandler(
           `Order cannot be cancelled. Current status: ${order.order_status}`,
-          400
-        )
+          400,
+        ),
       );
     }
 
-    // Cancel the order 
+    // Cancel the order
     await client.query(
       `UPDATE orders SET order_status = 'Cancelled', updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
-      [orderId]
+      [orderId],
     );
 
     // Restore stock
     const { rows: items } = await client.query(
       `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
-      [orderId]
+      [orderId],
     );
 
     for (const item of items) {
       await client.query(
         `UPDATE products SET stock = stock + $1 WHERE id = $2`,
-        [item.quantity, item.product_id]
+        [item.quantity, item.product_id],
       );
     }
 
-    // If already paid, initiate refund automatically 
+    // If already paid, initiate refund automatically
     let refundInitiated = false;
     if (
       order.payment_status === "Paid" &&
@@ -636,15 +730,18 @@ export const cancelOrder = catchAsyncErrors(async (req, res, next) => {
       !order.razorpay_payment_id.startsWith("pay_test")
     ) {
       try {
-        const refund = await razorpay.payments.refund(order.razorpay_payment_id, {
-          notes: { orderId, reason: "Order cancelled by user" },
-        });
+        const refund = await razorpay.payments.refund(
+          order.razorpay_payment_id,
+          {
+            notes: { orderId, reason: "Order cancelled by user" },
+          },
+        );
 
         await client.query(
           `UPDATE payments
            SET payment_status = 'Refunded', updated_at = CURRENT_TIMESTAMP
            WHERE order_id = $1`,
-          [orderId]
+          [orderId],
         );
 
         refundInitiated = true;
@@ -663,16 +760,17 @@ export const cancelOrder = catchAsyncErrors(async (req, res, next) => {
         : "Order cancelled successfully.",
       refundInitiated,
     });
-
   } catch (error) {
     await client.query("ROLLBACK");
-    return next(new ErrorHandler(error.message || "Order cancellation failed.", 500));
+    return next(
+      new ErrorHandler(error.message || "Order cancellation failed.", 500),
+    );
   } finally {
     client.release();
   }
 });
 
-// ADMIN — CANCEL ANY ORDER
+// 10. ADMIN — CANCEL ANY ORDER
 export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
   const client = await database.connect();
 
@@ -681,12 +779,16 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
 
     const { orderId } = req.params;
 
+    if (!isValidUUID(orderId)) {
+      return next(new ErrorHandler("Invalid order ID.", 400));
+    }
+
     const { rows } = await client.query(
       `SELECT o.*, p.payment_status, p.razorpay_payment_id
        FROM orders o
        LEFT JOIN payments p ON p.order_id = o.id
        WHERE o.id = $1`,
-      [orderId]
+      [orderId],
     );
 
     if (rows.length === 0) {
@@ -695,10 +797,10 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
 
     const order = rows[0];
 
-    // Admin cannot cancel already Delivered orders 
+    // Admin cannot cancel already Delivered orders
     if (order.order_status === "Delivered") {
       return next(
-        new ErrorHandler("Delivered orders cannot be cancelled.", 400)
+        new ErrorHandler("Delivered orders cannot be cancelled.", 400),
       );
     }
 
@@ -710,19 +812,19 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
     await client.query(
       `UPDATE orders SET order_status = 'Cancelled', updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
-      [orderId]
+      [orderId],
     );
 
-    // Restore stock 
+    // Restore stock
     const { rows: items } = await client.query(
       `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
-      [orderId]
+      [orderId],
     );
 
     for (const item of items) {
       await client.query(
         `UPDATE products SET stock = stock + $1 WHERE id = $2`,
-        [item.quantity, item.product_id]
+        [item.quantity, item.product_id],
       );
     }
 
@@ -742,7 +844,7 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
           `UPDATE payments
            SET payment_status = 'Refunded', updated_at = CURRENT_TIMESTAMP
            WHERE order_id = $1`,
-          [orderId]
+          [orderId],
         );
 
         refundInitiated = true;
@@ -760,7 +862,6 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
         : "Order cancelled successfully.",
       refundInitiated,
     });
-
   } catch (error) {
     await client.query("ROLLBACK");
     return next(new ErrorHandler(error.message || "Cancellation failed.", 500));
