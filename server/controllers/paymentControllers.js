@@ -12,7 +12,6 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_SECRET_KEY,
 });
 
-// Helper: INR → paise (Razorpay always works in paise)
 const toPaise = (inr) => Math.round(Number(inr) * 100);
 
 // 1. CREATE ORDER
@@ -22,9 +21,10 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
   try {
     await client.query("BEGIN");
 
-    const { cartItems, shippingInfo } = req.body;
+    const { cartItems, shippingInfo, addressId, coupon_code } = req.body;
     const buyerId = req.user.id;
 
+    //  Cart Validation
     if (!cartItems || cartItems.length === 0) {
       return next(new ErrorHandler("Cart is empty.", 400));
     }
@@ -35,7 +35,6 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       );
     }
 
-    // Validate each cart item
     for (const item of cartItems) {
       if (!item.productId) {
         return next(new ErrorHandler("Invalid product ID in cart.", 400));
@@ -53,43 +52,85 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       }
     }
 
-    if (!shippingInfo) {
-      return next(new ErrorHandler("Shipping information is required.", 400));
-    }
+    //  Shipping Info Resolution
+    // Either use a saved address (addressId) OR manual shippingInfo
+    let resolvedShipping;
 
-    const { full_name, state, city, country, address, pincode, phone } =
-      shippingInfo;
+    if (addressId) {
+      // Security: validate UUID format before hitting DB
+      if (!isValidUUID(addressId)) {
+        await client.query("ROLLBACK");
+        return next(new ErrorHandler("Invalid address ID.", 400));
+      }
 
-    if (
-      !full_name ||
-      !state ||
-      !city ||
-      !country ||
-      !address ||
-      !pincode ||
-      !phone
-    ) {
-      return next(new ErrorHandler("All shipping fields are required.", 400));
-    }
-    if (!/^\d{10}$/.test(phone)) {
-      return next(
-        new ErrorHandler("Invalid phone number. Must be 10 digits.", 400),
+      // Security: user_id check ensures user can't use someone else's address
+      const savedAddress = await client.query(
+        `SELECT * FROM user_addresses WHERE id = $1 AND user_id = $2`,
+        [addressId, buyerId],
       );
-    }
-    if (!/^\d{6}$/.test(pincode)) {
-      return next(new ErrorHandler("Invalid pincode. Must be 6 digits.", 400));
-    }
-    if (full_name.trim().length < 2 || full_name.trim().length > 100) {
-      return next(
-        new ErrorHandler(
-          "Full name must be between 2 and 100 characters.",
-          400,
-        ),
-      );
+
+      if (savedAddress.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return next(new ErrorHandler("Saved address not found.", 404));
+      }
+
+      resolvedShipping = savedAddress.rows[0];
+    } else {
+      // Manual shipping info
+      if (!shippingInfo) {
+        await client.query("ROLLBACK");
+        return next(new ErrorHandler("Shipping information is required.", 400));
+      }
+
+      const { full_name, state, city, country, address, pincode, phone } =
+        shippingInfo;
+
+      if (
+        !full_name ||
+        !state ||
+        !city ||
+        !country ||
+        !address ||
+        !pincode ||
+        !phone
+      ) {
+        await client.query("ROLLBACK");
+        return next(new ErrorHandler("All shipping fields are required.", 400));
+      }
+      if (!/^\d{10}$/.test(phone)) {
+        await client.query("ROLLBACK");
+        return next(
+          new ErrorHandler("Invalid phone number. Must be 10 digits.", 400),
+        );
+      }
+      if (!/^\d{6}$/.test(pincode)) {
+        await client.query("ROLLBACK");
+        return next(
+          new ErrorHandler("Invalid pincode. Must be 6 digits.", 400),
+        );
+      }
+      if (full_name.trim().length < 2 || full_name.trim().length > 100) {
+        await client.query("ROLLBACK");
+        return next(
+          new ErrorHandler(
+            "Full name must be between 2 and 100 characters.",
+            400,
+          ),
+        );
+      }
+
+      resolvedShipping = {
+        full_name,
+        state,
+        city,
+        country,
+        address,
+        pincode,
+        phone,
+      };
     }
 
-    // Fetch real prices from DB
-
+    //  Fetch Real Prices From DB 
     const productIds = cartItems.map((item) => item.productId);
     const { rows: products } = await client.query(
       `SELECT id, name, price, stock FROM products WHERE id = ANY($1::uuid[])`,
@@ -101,7 +142,7 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("One or more products not found.", 400));
     }
 
-    // Calculate totals using DB prices
+    //  Calculate Totals 
     let itemsPrice = 0;
 
     const validatedItems = cartItems.map((item) => {
@@ -131,13 +172,15 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
 
     const taxPrice = 0;
     const shippingPrice = itemsPrice > 500 ? 0 : 50;
-    const totalPrice = Math.round((itemsPrice + shippingPrice) * 100) / 100;
+    let totalPrice = Math.round((itemsPrice + shippingPrice) * 100) / 100;
 
-    // Amount validation
+    //  Amount Validation 
     if (totalPrice <= 0) {
+      await client.query("ROLLBACK");
       return next(new ErrorHandler("Invalid order amount.", 400));
     }
     if (totalPrice > 500000) {
+      await client.query("ROLLBACK");
       return next(
         new ErrorHandler(
           "Order amount exceeds maximum limit of ₹5,00,000.",
@@ -146,17 +189,124 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       );
     }
 
-    // Insert order
+    //  Coupon Validation 
+    let discountAmount = 0;
+    let appliedCouponId = null;
+
+    if (coupon_code) {
+      // Security: sanitize input
+      const sanitizedCode = coupon_code.trim().toUpperCase();
+
+      if (sanitizedCode.length > 50) {
+        await client.query("ROLLBACK");
+        return next(new ErrorHandler("Invalid coupon code.", 400));
+      }
+
+      const couponResult = await client.query(
+        `SELECT * FROM coupons WHERE UPPER(code) = $1`,
+        [sanitizedCode],
+      );
+
+      if (couponResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return next(new ErrorHandler("Invalid coupon code.", 400));
+      }
+
+      const coupon = couponResult.rows[0];
+      const now = new Date();
+
+      if (!coupon.is_active) {
+        await client.query("ROLLBACK");
+        return next(new ErrorHandler("This coupon is no longer active.", 400));
+      }
+
+      if (now < new Date(coupon.valid_from)) {
+        await client.query("ROLLBACK");
+        return next(new ErrorHandler("This coupon is not active yet.", 400));
+      }
+
+      if (now > new Date(coupon.valid_until)) {
+        await client.query("ROLLBACK");
+        return next(new ErrorHandler("This coupon has expired.", 400));
+      }
+
+      // Check against itemsPrice (before shipping) — fairer for users
+      if (itemsPrice < parseFloat(coupon.min_order_amount)) {
+        await client.query("ROLLBACK");
+        return next(
+          new ErrorHandler(
+            `Minimum order amount of ₹${coupon.min_order_amount} required for this coupon.`,
+            400,
+          ),
+        );
+      }
+
+      if (
+        coupon.usage_limit !== null &&
+        coupon.used_count >= coupon.usage_limit
+      ) {
+        await client.query("ROLLBACK");
+        return next(
+          new ErrorHandler("This coupon has reached its usage limit.", 400),
+        );
+      }
+
+      // Check per-user limit — inside transaction for accuracy
+      const userUsage = await client.query(
+        `SELECT COUNT(*) FROM coupon_usage WHERE coupon_id = $1 AND user_id = $2`,
+        [coupon.id, buyerId],
+      );
+
+      if (parseInt(userUsage.rows[0].count) >= coupon.per_user_limit) {
+        await client.query("ROLLBACK");
+        return next(
+          new ErrorHandler(
+            `You have already used this coupon ${coupon.per_user_limit} time(s).`,
+            400,
+          ),
+        );
+      }
+
+      // Calculate discount
+      if (coupon.type === "flat") {
+        discountAmount = parseFloat(coupon.discount_value);
+      } else {
+        discountAmount = (itemsPrice * parseFloat(coupon.discount_value)) / 100;
+        if (coupon.max_discount !== null) {
+          discountAmount = Math.min(
+            discountAmount,
+            parseFloat(coupon.max_discount),
+          );
+        }
+      }
+
+      // Discount can never exceed total
+      discountAmount = Math.min(discountAmount, totalPrice);
+      discountAmount = Math.round(discountAmount * 100) / 100;
+
+      totalPrice = Math.round((totalPrice - discountAmount) * 100) / 100;
+      appliedCouponId = coupon.id;
+    }
+
+    //  Insert Order 
     const {
       rows: [order],
     } = await client.query(
-      `INSERT INTO orders (buyer_id, total_price, tax_price, shipping_price, order_status)
-       VALUES ($1, $2, $3, $4, 'Processing')
+      `INSERT INTO orders 
+       (buyer_id, total_price, tax_price, shipping_price, order_status, coupon_code, discount_amount)
+       VALUES ($1, $2, $3, $4, 'Processing', $5, $6)
        RETURNING *`,
-      [buyerId, totalPrice, taxPrice, shippingPrice],
+      [
+        buyerId,
+        totalPrice,
+        taxPrice,
+        shippingPrice,
+        coupon_code ? coupon_code.trim().toUpperCase() : null,
+        discountAmount,
+      ],
     );
 
-    // Insert order items
+    //  Insert Order Items 
     for (const item of validatedItems) {
       await client.query(
         `INSERT INTO order_items (order_id, product_id, quantity, price, image, title)
@@ -172,22 +322,23 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       );
     }
 
+    //  Insert Shipping Info 
     await client.query(
       `INSERT INTO shipping_info (order_id, full_name, state, city, country, address, pincode, phone)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         order.id,
-        full_name.trim(),
-        state.trim(),
-        city.trim(),
-        country.trim(),
-        address.trim(),
-        pincode.trim(),
-        phone.trim(),
+        resolvedShipping.full_name.trim(),
+        resolvedShipping.state.trim(),
+        resolvedShipping.city.trim(),
+        resolvedShipping.country.trim(),
+        resolvedShipping.address.trim(),
+        resolvedShipping.pincode.trim(),
+        resolvedShipping.phone.trim(),
       ],
     );
 
-    // Create Razorpay order
+    //  Create Razorpay Order 
     const razorpayOrder = await razorpay.orders.create({
       amount: toPaise(totalPrice),
       currency: "INR",
@@ -198,7 +349,7 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       },
     });
 
-    // Insert payment record
+    //  Insert Payment Record 
     await client.query(
       `INSERT INTO payments (order_id, payment_type, payment_status, razorpay_order_id)
        VALUES ($1, 'Online', 'Pending', $2)`,
@@ -207,13 +358,28 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
 
     await client.query("COMMIT");
 
+    //  Record Coupon Usage After Successful COMMIT 
+    if (appliedCouponId) {
+      await database.query(
+        `UPDATE coupons SET used_count = used_count + 1 WHERE id = $1`,
+        [appliedCouponId],
+      );
+      await database.query(
+        `INSERT INTO coupon_usage (coupon_id, user_id, order_id) VALUES ($1, $2, $3)`,
+        [appliedCouponId, buyerId, order.id],
+      );
+    }
+
+    //  Response 
     res.status(201).json({
       success: true,
       orderId: order.id,
       razorpayOrderId: razorpayOrder.id,
       amount: `₹${(razorpayOrder.amount / 100).toLocaleString("en-IN")}`,
       currency: "INR",
-      keyId: process.env.RAZORPAY_FRONTEND_KEY, // safe — public key
+      keyId: process.env.RAZORPAY_FRONTEND_KEY,
+      couponApplied: appliedCouponId ? true : false,
+      discountAmount: discountAmount > 0 ? `₹${discountAmount}` : null,
     });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -369,7 +535,9 @@ export const handleWebhook = async (req, res) => {
 
         // ✅ Check if payment was updated
         if (paymentUpdate.rows.length === 0) {
-          throw new Error(`Payment record not found for order: ${razorpayOrderId}`);
+          throw new Error(
+            `Payment record not found for order: ${razorpayOrderId}`,
+          );
         }
 
         const orderId = paymentUpdate.rows[0].order_id;
@@ -441,7 +609,6 @@ export const handleWebhook = async (req, res) => {
 
     // Always respond 200 quickly — Razorpay retries if you don't
     return res.status(200).json({ received: true });
-    
   } catch (error) {
     // ✅ FIX: Only rollback if transaction was started
     if (transactionStarted) {
@@ -449,17 +616,19 @@ export const handleWebhook = async (req, res) => {
         await client.query("ROLLBACK");
         console.log("🔄 Webhook transaction rolled back");
       } catch (rollbackError) {
-        console.error("❌ Failed to rollback transaction:", rollbackError.message);
+        console.error(
+          "❌ Failed to rollback transaction:",
+          rollbackError.message,
+        );
       }
     }
-    
+
     console.error("❌ Webhook processing error:", error.message);
     // Return 200 anyway so Razorpay doesn't retry a legitimate event
-    return res.status(200).json({ 
-      received: true, 
-      warning: "Internal processing error." 
+    return res.status(200).json({
+      received: true,
+      warning: "Internal processing error.",
     });
-    
   } finally {
     client.release();
   }

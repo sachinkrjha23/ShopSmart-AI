@@ -6,6 +6,9 @@ import { createProductReviewsTable } from "../models/productReviewsTable.js";
 import { createProductsTable } from "../models/productTable.js";
 import { createShippingInfoTable } from "../models/shipping_info.js";
 import database from "../database/db.js";
+import { createWishlistTable } from "../models/wishlistTable.js";
+import { createAddressTable } from "../models/addressTable.js";
+import { createCouponTables } from "../models/couponTable.js";
 
 
 export const createTables = async() =>{
@@ -22,6 +25,9 @@ export const createTables = async() =>{
         await createOrderItemTable();
         await createShippingInfoTable();
         await createPaymentsTable();
+        await createWishlistTable();
+        await createAddressTable();
+        await createCouponTables();
 
         await database.query(`
             CREATE TABLE IF NOT EXISTS webhook_logs (

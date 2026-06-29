@@ -10,6 +10,8 @@ export async function createOrdersTable() {
     tax_price      DECIMAL(10,2) NOT NULL CHECK (tax_price >= 0),
     shipping_price DECIMAL(10,2) NOT NULL CHECK (shipping_price >= 0),
     order_status   VARCHAR(50) DEFAULT 'Processing' CHECK (order_status IN ('Processing', 'Shipped', 'Delivered', 'Cancelled')),
+    coupon_code VARCHAR(50) DEFAULT NULL,
+    discount_amount DECIMAL(10,2) DEFAULT 0,
     paid_at        TIMESTAMP CHECK (paid_at IS NULL OR paid_at <= CURRENT_TIMESTAMP),
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 

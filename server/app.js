@@ -9,6 +9,9 @@ import  authRouter from "./router/authRoutes.js";
 import productRouter from "./router/productRoutes.js";
 import adminRouter from "./router/adminRoutes.js";
 import paymentRouter from "./router/paymentRoutes.js"; 
+import wishlistRouter from "./router/wishlistRoutes.js";
+import addressRouter from "./router/addressRoutes.js";
+import couponRouter from "./router/couponRoutes.js";
 
 
 const app = express();
@@ -37,6 +40,9 @@ app.use(
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/product", productRouter);
 app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/wishlist", wishlistRouter);
+app.use("/api/v1/address", addressRouter);
+app.use("/api/v1/coupon", couponRouter);
 
 await createTables();
 
