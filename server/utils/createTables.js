@@ -9,6 +9,8 @@ import database from "../database/db.js";
 import { createWishlistTable } from "../models/wishlistTable.js";
 import { createAddressTable } from "../models/addressTable.js";
 import { createCouponTables } from "../models/couponTable.js";
+import { createCategoriesTable } from "../models/categoryTable.js"; 
+
 
 
 export const createTables = async() =>{
@@ -19,6 +21,7 @@ export const createTables = async() =>{
 
         
         await createUserTable();
+        await createCategoriesTable(); 
         await createProductsTable();
         await createOrdersTable();
         await createProductReviewsTable();

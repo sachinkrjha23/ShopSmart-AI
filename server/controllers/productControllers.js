@@ -28,6 +28,23 @@ export const createProduct = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
+  // ✅ Validate category against the categories table (case-insensitive)
+  const categoryCheck = await database.query(
+    `SELECT name FROM categories WHERE LOWER(name) = LOWER($1)`,
+    [category.trim()],
+  );
+
+  if (categoryCheck.rows.length === 0) {
+    return next(
+      new ErrorHandler(
+        `"${category}" is not a valid category. Please choose an existing category or add it first.`,
+        400,
+      ),
+    );
+  }
+
+  const canonicalCategory = categoryCheck.rows[0].name; // ✅ store DB's canonical casing
+
   let uploadedImages = [];
 
   if (req.files && req.files.images) {
@@ -83,7 +100,7 @@ export const createProduct = catchAsyncErrors(async (req, res, next) => {
       name.trim(),
       description.trim(),
       parsedPrice,
-      category.trim(),
+      canonicalCategory,
       parsedStock,
       JSON.stringify(uploadedImages),
       created_by,
@@ -144,15 +161,62 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     index++;
   }
 
-  // Add search query
   if (search) {
-    conditions.push(
-      `(p.name ILIKE $${index} OR p.description ILIKE $${index})`,
-    );
-    values.push(`%${search}%`);
-    index++;
-  }
+    const searchTerm = search.trim();
 
+    // Split search into keywords
+    const keywords = searchTerm
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((word) => word.length > 1);
+
+    // Add synonyms for each keyword
+    const synonyms = {
+      smartphone: [
+        "phone",
+        "mobile",
+        "cell",
+        "android",
+        "iphone",
+        "samsung",
+        "oneplus",
+      ],
+      phone: ["smartphone", "mobile", "cell", "android", "iphone"],
+      laptop: ["computer", "notebook", "macbook", "dell", "hp", "lenovo"],
+      // ... add more as needed
+    };
+
+    const expandedKeywords = [];
+    for (const word of keywords) {
+      expandedKeywords.push(word);
+      if (synonyms[word]) {
+        expandedKeywords.push(...synonyms[word]);
+      }
+      for (const [key, syns] of Object.entries(synonyms)) {
+        if (syns.includes(word)) {
+          expandedKeywords.push(key);
+          break;
+        }
+      }
+    }
+
+    // Remove duplicates
+    const uniqueKeywords = [...new Set(expandedKeywords)];
+
+    const searchConditions = uniqueKeywords.map((word) => {
+      const currentIdx = index; // Capture current index
+      index++; // Increment for next placeholder
+      return `(p.name ILIKE $${currentIdx} OR p.description ILIKE $${currentIdx})`;
+    });
+
+    conditions.push(`(${searchConditions.join(" OR ")})`);
+
+    // Add each keyword as a search term with wildcards
+    uniqueKeywords.forEach((word) => {
+      values.push(`%${word}%`);
+    });
+  }
+  
   const whereClause = conditions.length
     ? `WHERE ${conditions.join(" AND ")}`
     : "";
@@ -225,7 +289,8 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
 
 export const updateProduct = catchAsyncErrors(async (req, res, next) => {
   const { productId } = req.params;
-  const { name, description, price, category, stock } = req.body;
+  
+  const { name, description, price, category, stock } = req.body || {};
 
   // Check if product exists
   const product = await database.query("SELECT * FROM products WHERE id = $1", [
@@ -236,79 +301,86 @@ export const updateProduct = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Product not found.", 404));
   }
 
-  // ✅ WHITELIST allowed fields
   const allowedFields = ["name", "description", "price", "category", "stock"];
   const updates = [];
   const values = [];
   let index = 1;
 
-  // ✅ Only update whitelisted fields
-  if (name && allowedFields.includes("name")) {
+  if (name !== undefined && name !== null && name.trim() !== '') {
     updates.push(`name = $${index}`);
     values.push(name.trim());
     index++;
   }
 
-  if (description && allowedFields.includes("description")) {
+  if (description !== undefined && description !== null && description.trim() !== '') {
     updates.push(`description = $${index}`);
     values.push(description.trim());
     index++;
   }
 
-  if (price && allowedFields.includes("price")) {
+  if (price !== undefined && price !== null && price !== '') {
     const parsedPrice = parseFloat(String(price).replace(/,/g, ""));
     if (isNaN(parsedPrice) || parsedPrice <= 0) {
-      return next(
-        new ErrorHandler("Please provide a valid product price.", 400),
-      );
+      return next(new ErrorHandler("Please provide a valid product price.", 400));
     }
     updates.push(`price = $${index}`);
     values.push(parsedPrice);
     index++;
   }
 
-  if (category && allowedFields.includes("category")) {
+  if (category !== undefined && category !== null && category.trim() !== '') {
+    const categoryCheck = await database.query(
+      `SELECT name FROM categories WHERE LOWER(name) = LOWER($1)`,
+      [category.trim()],
+    );
+
+    if (categoryCheck.rows.length === 0) {
+      return next(
+        new ErrorHandler(
+          `"${category}" is not a valid category. Please choose an existing category or add it first.`,
+          400,
+        ),
+      );
+    }
+
     updates.push(`category = $${index}`);
-    values.push(category.trim());
+    values.push(categoryCheck.rows[0].name);
     index++;
   }
 
-  if (stock !== undefined && allowedFields.includes("stock")) {
+  if (stock !== undefined && stock !== null && stock !== '') {
     const parsedStock = parseInt(stock);
     if (isNaN(parsedStock) || parsedStock < 0) {
-      return next(
-        new ErrorHandler("Please provide a valid stock quantity.", 400),
-      );
+      return next(new ErrorHandler("Please provide a valid stock quantity.", 400));
     }
     updates.push(`stock = $${index}`);
     values.push(parsedStock);
     index++;
   }
 
-  // Handle image updates
-  let uploadedImages = product.rows[0].images;
+  let uploadedImages = product.rows[0].images || [];
 
   if (req.files && req.files.images) {
-    // ✅ Validate images first
     const images = Array.isArray(req.files.images)
       ? req.files.images
       : [req.files.images];
 
-    // Check file types and sizes
     const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const maxSize = 2 * 1024 * 1024;
+
     for (const image of images) {
       if (!allowedTypes.includes(image.mimetype)) {
-        return next(new ErrorHandler(`Invalid file type: ${image.name}`, 400));
+        return next(new ErrorHandler(`Invalid file type: ${image.name}. Only JPEG, PNG, WEBP, and GIF are allowed.`, 400));
       }
-      if (image.size > 2 * 1024 * 1024) {
-        return next(new ErrorHandler(`File too large: ${image.name}`, 400));
+      if (image.size > maxSize) {
+        return next(new ErrorHandler(`File too large: ${image.name}. Maximum size is 2MB.`, 400));
       }
     }
 
     const newUploadedImages = [];
     for (const image of images) {
       try {
-        const result = await cloudinary.uploader.upload(image.tempFilePath, {
+        const result = await cloudinary.uploader.upload(image.tempFilePath || image.data, {
           folder: "ShopSmart-AI_Product_Images",
           width: 1000,
           height: 1000,
@@ -319,12 +391,10 @@ export const updateProduct = catchAsyncErrors(async (req, res, next) => {
           public_id: result.public_id,
         });
       } catch (error) {
-        // ✅ If upload fails, old images are still safe
         return next(new ErrorHandler(`Failed to upload ${image.name}`, 500));
       }
     }
 
-    // ✅ Only after successful upload, delete old images
     const oldImages = product.rows[0].images || [];
     if (oldImages.length > 0) {
       for (const image of oldImages) {
@@ -336,7 +406,6 @@ export const updateProduct = catchAsyncErrors(async (req, res, next) => {
       }
     }
 
-    // ✅ Use the new images
     uploadedImages = newUploadedImages;
     updates.push(`images = $${index}`);
     values.push(JSON.stringify(uploadedImages));
@@ -347,7 +416,6 @@ export const updateProduct = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("No fields provided to update.", 400));
   }
 
-  // ✅ Now safe because all field names are from whitelist
   values.push(productId);
   const result = await database.query(
     `UPDATE products SET ${updates.join(", ")} WHERE id = $${index} RETURNING *`,
@@ -619,24 +687,265 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
 
     const filterKeywords = (query) => {
       const stopWords = new Set([
-        "the", "they", "them", "then", "i", "we", "you", "he", "she",
-        "it", "is", "a", "an", "of", "and", "or", "to", "for", "from",
-        "on", "who", "whom", "why", "when", "which", "with", "this",
-        "that", "in", "at", "by", "be", "not", "was", "were", "has",
-        "have", "had", "do", "does", "did", "so", "some", "any", "how",
-        "can", "could", "should", "would", "there", "here", "just",
-        "than", "because", "but", "its", "it's", "if", "want", "need",
-        "looking", "get", "buy", "purchase", "good", "best", "great",
-        "nice", "perfect", "ideal",
+        "the",
+        "they",
+        "them",
+        "then",
+        "i",
+        "we",
+        "you",
+        "he",
+        "she",
+        "it",
+        "is",
+        "a",
+        "an",
+        "of",
+        "and",
+        "or",
+        "to",
+        "for",
+        "from",
+        "on",
+        "who",
+        "whom",
+        "why",
+        "when",
+        "which",
+        "with",
+        "this",
+        "that",
+        "in",
+        "at",
+        "by",
+        "be",
+        "not",
+        "was",
+        "were",
+        "has",
+        "have",
+        "had",
+        "do",
+        "does",
+        "did",
+        "so",
+        "some",
+        "any",
+        "how",
+        "can",
+        "could",
+        "should",
+        "would",
+        "there",
+        "here",
+        "just",
+        "than",
+        "because",
+        "but",
+        "its",
+        "it's",
+        "if",
+        "want",
+        "need",
+        "looking",
+        "get",
+        "buy",
+        "purchase",
+        "good",
+        "best",
+        "great",
+        "nice",
+        "perfect",
+        "ideal",
       ]);
 
-      return query
+      // ✅ Add synonym mapping for better search
+      const synonyms = {
+        smartphone: [
+          "phone",
+          "mobile",
+          "cell",
+          "android",
+          "iphone",
+          "samsung",
+          "oneplus",
+          "xiaomi",
+          "pixel",
+        ],
+        phone: ["smartphone", "mobile", "cell", "android", "iphone"],
+        laptop: [
+          "computer",
+          "notebook",
+          "macbook",
+          "dell",
+          "hp",
+          "lenovo",
+          "acer",
+          "asus",
+        ],
+        tv: [
+          "television",
+          "smart tv",
+          "led",
+          "oled",
+          "qled",
+          "samsung tv",
+          "sony tv",
+          "lg tv",
+        ],
+        headphones: [
+          "earphones",
+          "earbuds",
+          "headset",
+          "airpods",
+          "wireless earphones",
+          "neckband",
+        ],
+        speaker: [
+          "bluetooth speaker",
+          "soundbar",
+          "audio",
+          "jbl",
+          "sony",
+          "boAt",
+          "speakers",
+        ],
+        watch: [
+          "smartwatch",
+          "apple watch",
+          "samsung watch",
+          "fitness tracker",
+          "wearable",
+        ],
+        camera: [
+          "dslr",
+          "mirrorless",
+          "gopro",
+          "action camera",
+          "sony camera",
+          "canon",
+          "nikon",
+        ],
+        bag: [
+          "backpack",
+          "laptop bag",
+          "travel bag",
+          "sling bag",
+          "rucksack",
+          "school bag",
+        ],
+        shoe: [
+          "sneakers",
+          "running shoes",
+          "sports shoes",
+          "nike",
+          "adidas",
+          "puma",
+          "casual shoes",
+        ],
+        "t-shirt": [
+          "tshirt",
+          "t shirt",
+          "shirt",
+          "polo",
+          "casual shirt",
+          "round neck",
+        ],
+        jeans: ["denim", "pants", "trousers", "joggers", "cargo"],
+        jacket: [
+          "coat",
+          "winter jacket",
+          "leather jacket",
+          "hoodie",
+          "bomber jacket",
+        ],
+        book: ["books", "novel", "textbook", "reading", "storybook"],
+        furniture: [
+          "chair",
+          "table",
+          "desk",
+          "sofa",
+          "bed",
+          "cabinet",
+          "shelf",
+        ],
+        kitchen: [
+          "cookware",
+          "utensils",
+          "pots",
+          "pans",
+          "knives",
+          "cutting board",
+        ],
+        gaming: [
+          "game",
+          "controller",
+          "playstation",
+          "xbox",
+          "nintendo",
+          "pc gaming",
+        ],
+        drone: ["quadcopter", "dji", "aerial", "camera drone"],
+        charger: [
+          "charging",
+          "adapter",
+          "power bank",
+          "type c",
+          "usb",
+          "wireless charger",
+        ],
+        monitor: ["display", "screen", "computer monitor", "gaming monitor"],
+        keyboard: ["mechanical keyboard", "wireless keyboard", "keypad"],
+        mouse: ["wireless mouse", "gaming mouse", "computer mouse"],
+        printer: ["inkjet", "laser printer", "all-in-one", "label printer"],
+        router: ["wifi", "wireless router", "mesh network", "dual band"],
+        fridge: ["refrigerator", "freezer", "cooler", "mini fridge"],
+        "washing machine": [
+          "washer",
+          "laundry",
+          "washing machine",
+          "top load",
+          "front load",
+        ],
+        mixer: ["blender", "grinder", "food processor", "juicer"],
+        iron: ["steam iron", "clothes iron", "dry iron"],
+        vacuum: ["vacuum cleaner", "robot vacuum", "hoover", "cleaning"],
+        toaster: ["bread toaster", "griller", "sandwich maker"],
+        microwave: ["microwave oven", "convection microwave", "oven"],
+        purifier: ["air purifier", "water purifier", "filter", "RO"],
+        fan: ["ceiling fan", "table fan", "standing fan", "exhaust fan"],
+        ac: ["air conditioner", "window ac", "split ac", "inverter ac"],
+        heater: ["room heater", "space heater", "water heater", "geyser"],
+        bed: ["bed frame", "mattress", "bedsheet", "pillow"],
+        sofa: ["couch", "l-shaped sofa", "recliner", "sofa cum bed"],
+      };
+
+      // Clean and split the query
+      let words = query
         .toLowerCase()
         .replace(/[^\w\s]/g, " ")
         .split(/\s+/)
-        .filter((word) => word.length > 1 && !stopWords.has(word))
+        .filter((word) => word.length > 1 && !stopWords.has(word));
+
+      // Expand with synonyms
+      const expandedWords = [...words];
+      for (const word of words) {
+        if (synonyms[word]) {
+          expandedWords.push(...synonyms[word]);
+        }
+        // Also check if any word is a synonym of something
+        for (const [key, syns] of Object.entries(synonyms)) {
+          if (syns.includes(word)) {
+            expandedWords.push(key);
+            break;
+          }
+        }
+      }
+
+      // Remove duplicates and return as SQL LIKE patterns
+      return [...new Set(expandedWords)]
         .map((word) => `%${word}%`)
-        .slice(0, 10);
+        .slice(0, 15); // Allow more terms
     };
 
     const keywords = filterKeywords(userPrompt);
@@ -649,6 +958,8 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
       });
     }
 
+    console.log(`🔍 AI Search keywords: ${keywords.join(", ")}`);
+
     // STEP 1: Basic SQL Filtering
     const result = await database.query(
       `
@@ -657,10 +968,17 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
         OR description ILIKE ANY($1)
         OR category ILIKE ANY($1))
         AND stock > 0
-        ORDER BY ratings DESC, created_at DESC
+        ORDER BY 
+          CASE 
+            WHEN name ILIKE ANY($2) THEN 1
+            WHEN category ILIKE ANY($2) THEN 2
+            ELSE 3
+          END,
+          ratings DESC, 
+          created_at DESC
         LIMIT 50;     
         `,
-      [keywords],
+      [keywords, keywords], // Passing keywords twice for the CASE statement
     );
 
     const filteredProducts = result.rows;
@@ -685,22 +1003,17 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
 
       aiSuccess = success;
 
-      // ✅ FIX: Only use AI results if successful
       if (success) {
-        // ✅ AI returned results (even if empty array)
         finalProducts = products;
       } else {
-        // ✅ AI failed (error), fallback to SQL
         console.log("⚠️ AI failed, falling back to SQL results");
         finalProducts = filteredProducts.slice(0, 10);
       }
     } catch (error) {
-      // AI crashed
       console.error("❌ AI crashed:", error.message);
       finalProducts = filteredProducts.slice(0, 10);
     }
 
-    // ✅ Check if AI successfully returned empty
     if (aiSuccess && finalProducts.length === 0) {
       return res.status(200).json({
         success: true,
@@ -711,8 +1024,48 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
 
     res.status(200).json({
       success: true,
-      message: finalProducts.length > 0 ? "AI filtered products." : "No products found.",
+      message:
+        finalProducts.length > 0
+          ? "AI filtered products."
+          : "No products found.",
       products: finalProducts,
     });
   },
 );
+
+export const getCategories = catchAsyncErrors(async (req, res, next) => {
+  const result = await database.query(
+    `SELECT name FROM categories ORDER BY name ASC`,
+  );
+
+  res.status(200).json({
+    success: true,
+    categories: result.rows.map((row) => row.name),
+  });
+});
+
+export const getTopReviews = catchAsyncErrors(async (req, res, next) => {
+  const result = await database.query(`
+    SELECT 
+      r.id,
+      r.rating,
+      r.comment,
+      r.created_at,
+      u.name AS reviewer_name,
+      u.avatar AS reviewer_avatar,
+      p.name AS product_name
+    FROM reviews r
+    JOIN users u ON r.user_id = u.id
+    JOIN products p ON r.product_id = p.id
+    WHERE r.rating >= 4 
+      AND r.comment IS NOT NULL 
+      AND TRIM(r.comment) != ''
+    ORDER BY r.rating DESC, r.created_at DESC
+    LIMIT 6;
+  `);
+
+  res.status(200).json({
+    success: true,
+    reviews: result.rows,
+  });
+});

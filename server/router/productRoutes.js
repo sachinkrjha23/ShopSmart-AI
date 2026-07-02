@@ -1,13 +1,24 @@
 import express from "express";
-import { createProduct , fetchAllProducts, updateProduct, deleteProduct, fetchSingleProduct, postProductReview, deleteReview , fetchAIFilteredProducts  } from "../controllers/productControllers.js";
+import rateLimit from "express-rate-limit";
+import { createProduct , fetchAllProducts, updateProduct, deleteProduct, fetchSingleProduct, postProductReview, deleteReview , fetchAIFilteredProducts, getCategories, getTopReviews } from "../controllers/productControllers.js";
 
 import { authorizedRoles, isAuthenticated} from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15,
+  message: { success: false, message: "Too many AI search requests. Please try again after 15 minutes." },
+});
+
 router.post("/admin/create", isAuthenticated, authorizedRoles("Admin"), createProduct);
 
 router.get("/", fetchAllProducts);
+
+router.get("/categories", getCategories); 
+
+router.get("/reviews/top", getTopReviews); 
 
 router.get("/singleProduct/:productId", fetchSingleProduct);
 
@@ -19,7 +30,7 @@ router.put("/post-new/review/:productId", isAuthenticated, postProductReview);
 
 router.delete("/delete/review/:productId", isAuthenticated, deleteReview);
 
-router.post("/ai/recommend", isAuthenticated, fetchAIFilteredProducts);
+router.post("/ai/recommend", isAuthenticated, aiLimiter,  fetchAIFilteredProducts);
 
 
 export default router;
