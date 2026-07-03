@@ -10,6 +10,8 @@ import crypto from "crypto";
 import validator from "validator";
 import { validatePassword } from "../utils/passwordValidation.js";
 import { v2 as cloudinary } from "cloudinary";
+import { OAuth2Client } from "google-auth-library";
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const register = catchAsyncErrors(async (req, res, next) => {
   const { name, email, password } = req.body;
@@ -73,6 +75,15 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Invalid email or password.", 401));
   }
 
+  if (!user.rows[0].password) {
+    return next(
+      new ErrorHandler(
+        "This account uses Google Sign-In. Please log in with Google.",
+        400,
+      ),
+    );
+  }
+
   const isPasswordMatch = await bcrypt.compare(password, user.rows[0].password);
 
   if (!isPasswordMatch) {
@@ -82,11 +93,136 @@ export const login = catchAsyncErrors(async (req, res, next) => {
   sendToken(user.rows[0], 200, "Logged In.", res);
 });
 
+const verifyGoogleCredential = async (credential) => {
+  const ticket = await googleClient.verifyIdToken({
+    idToken: credential,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+  return ticket.getPayload();
+};
+
+export const googleLogin = catchAsyncErrors(async (req, res, next) => {
+  const { credential } = req.body;
+
+  if (!credential) {
+    return next(new ErrorHandler("Google credential is required.", 400));
+  }
+
+  let payload;
+  try {
+    payload = await verifyGoogleCredential(credential);
+  } catch (error) {
+    return next(new ErrorHandler("Invalid Google credential.", 401));
+  }
+
+  const { email, sub: googleId, email_verified } = payload;
+
+  if (!email || !email_verified) {
+    return next(
+      new ErrorHandler("Google account email is missing or unverified.", 400),
+    );
+  }
+
+  // 1. Already linked to this Google account
+  let userResult = await database.query(
+    `SELECT * FROM users WHERE google_id = $1`,
+    [googleId],
+  );
+
+  if (userResult.rows.length > 0) {
+    return sendToken(userResult.rows[0], 200, "Logged in with Google.", res);
+  }
+
+  // 2. Existing email/password account, not yet linked — this IS an existing
+  // account, so auto-link + login is correct here, not a violation of "login
+  // only works for existing accounts."
+  userResult = await database.query(`SELECT * FROM users WHERE email = $1`, [
+    email,
+  ]);
+
+  if (userResult.rows.length > 0) {
+    const linkedUser = await database.query(
+      `UPDATE users SET google_id = $1 WHERE id = $2 RETURNING *`,
+      [googleId, userResult.rows[0].id],
+    );
+    return sendToken(
+      linkedUser.rows[0],
+      200,
+      "Google account linked and logged in.",
+      res,
+    );
+  }
+
+  // 3. No account at all — reject, don't silently create one
+  return next(
+    new ErrorHandler(
+      "No account found with this email. Please sign up first.",
+      404,
+    ),
+  );
+});
+
+export const googleSignup = catchAsyncErrors(async (req, res, next) => {
+  const { credential } = req.body;
+
+  if (!credential) {
+    return next(new ErrorHandler("Google credential is required.", 400));
+  }
+
+  let payload;
+  try {
+    payload = await verifyGoogleCredential(credential);
+  } catch (error) {
+    return next(new ErrorHandler("Invalid Google credential.", 401));
+  }
+
+  const { email, name, picture, sub: googleId, email_verified } = payload;
+
+  if (!email || !email_verified) {
+    return next(
+      new ErrorHandler("Google account email is missing or unverified.", 400),
+    );
+  }
+
+  // Reject if this email is already registered in ANY form (password or Google)
+  const existing = await database.query(
+    `SELECT id FROM users WHERE email = $1 OR google_id = $2`,
+    [email, googleId],
+  );
+
+  if (existing.rows.length > 0) {
+    return next(
+      new ErrorHandler(
+        "An account with this email already exists. Please login instead.",
+        409,
+      ),
+    );
+  }
+
+  const rawName = name || email.split("@")[0];
+  const safeName =
+    rawName.length >= 3 ? rawName.slice(0, 100) : rawName.padEnd(3, "_").slice(0, 100);
+
+  const newUser = await database.query(
+    `INSERT INTO users (name, email, google_id, avatar)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [
+      safeName,
+      email,
+      googleId,
+      picture ? JSON.stringify({ url: picture, public_id: null }) : null,
+    ],
+  );
+
+  sendToken(newUser.rows[0], 201, "Account created with Google.", res);
+});
+
 export const getUser = catchAsyncErrors(async (req, res, next) => {
-  const { user } = req;
+  const { password, ...safeUser } = req.user;
   res.status(200).json({
     success: true,
-    user,
+    user: safeUser,
   });
 });
 
@@ -254,7 +390,7 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
 
 export const updateProfile = catchAsyncErrors(async (req, res, next) => {
   const { name, email, removeAvatar } = req.body;
-  
+
   // 1. Validate user exists
   if (!req.user?.id) {
     return next(new ErrorHandler("User not authenticated.", 401));
@@ -296,7 +432,7 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
   }
 
   // 5. Handle avatar operations
-  const shouldRemoveAvatar = removeAvatar === 'true' || removeAvatar === true;
+  const shouldRemoveAvatar = removeAvatar === "true" || removeAvatar === true;
   const hasNewAvatar = req.files?.avatar;
   let newAvatarData = null; // null = no change, 'remove' = remove, object = new avatar
 
@@ -322,9 +458,9 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
 
   // 6. Perform database update with transaction
   const client = await database.connect();
-  
+
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     let user;
     let oldAvatarPublicId = req.user?.avatar?.public_id || null;
@@ -342,13 +478,13 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
             crop: "scale",
           },
         );
-        
+
         newAvatarData = {
           public_id: newProfileImage.public_id,
           url: newProfileImage.secure_url,
         };
       } catch (error) {
-        await client.query('ROLLBACK');
+        await client.query("ROLLBACK");
         return next(
           new ErrorHandler("Failed to upload avatar. Please try again.", 500),
         );
@@ -358,18 +494,18 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
     // 6b. Determine avatar operation for DB
     let avatarOperation;
     if (shouldRemoveAvatar) {
-      avatarOperation = 'REMOVE';
+      avatarOperation = "REMOVE";
     } else if (newAvatarData) {
-      avatarOperation = 'UPDATE';
+      avatarOperation = "UPDATE";
     } else {
-      avatarOperation = 'KEEP';
+      avatarOperation = "KEEP";
     }
 
     // 6c. Update database
     let query, params;
-    
+
     switch (avatarOperation) {
-      case 'REMOVE':
+      case "REMOVE":
         query = `
           UPDATE users 
           SET name = $1, email = $2, avatar = NULL 
@@ -378,8 +514,8 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
         `;
         params = [trimmedName, trimmedEmail, req.user.id];
         break;
-        
-      case 'UPDATE':
+
+      case "UPDATE":
         query = `
           UPDATE users 
           SET name = $1, email = $2, avatar = $3 
@@ -388,8 +524,8 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
         `;
         params = [trimmedName, trimmedEmail, newAvatarData, req.user.id];
         break;
-        
-      case 'KEEP':
+
+      case "KEEP":
       default:
         query = `
           UPDATE users 
@@ -405,11 +541,11 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
     user = result.rows[0];
 
     if (!user) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return next(new ErrorHandler("User not found.", 404));
     }
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     // 7. Clean up old avatar files (after successful transaction)
     if (shouldRemoveAvatar && oldAvatarPublicId) {
@@ -434,21 +570,22 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
       message: "Profile updated successfully.",
       user: user,
     });
-
   } catch (error) {
-    await client.query('ROLLBACK');
-    
+    await client.query("ROLLBACK");
+
     // Clean up newly uploaded avatar if transaction failed
     if (newAvatarData) {
       try {
         await cloudinary.uploader.destroy(newAvatarData.public_id);
-        console.log(`✅ Cleaned up uploaded avatar: ${newAvatarData.public_id}`);
+        console.log(
+          `✅ Cleaned up uploaded avatar: ${newAvatarData.public_id}`,
+        );
       } catch (cleanupError) {
         console.error("Error cleaning up avatar:", cleanupError);
       }
     }
-    
-    throw error; 
+
+    throw error;
   } finally {
     client.release();
   }

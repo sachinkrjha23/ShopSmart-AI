@@ -5,6 +5,7 @@ import { closeRegisterModal, openLoginModal } from '../../store/slices/uiSlice'
 import Modal from '../ui/Modal'
 import Input from '../ui/Input'
 import Button from '../ui/Button'
+import GoogleLoginButton from './GoogleLoginButton'
 import { toast } from 'react-hot-toast'
 
 const RegisterModal = () => {
@@ -99,6 +100,15 @@ const RegisterModal = () => {
         <Button type="submit" fullWidth disabled={loading}>
           {loading ? 'Creating account...' : 'Register'}
         </Button>
+
+        <div className="flex items-center gap-3 my-2">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-xs text-gray-400 uppercase">or</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
+
+        <GoogleLoginButton mode="signup" />
+
         <p className="text-sm text-center text-gray-600">
           Already have an account?{' '}
           <button

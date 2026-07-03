@@ -6,6 +6,8 @@ import {
   registerUser,
   updateProfile,
   updatePassword,
+  googleLoginUser,
+  googleSignupUser
 } from "../../api/authApi";
 
 export const register = createAsyncThunk(
@@ -30,6 +32,30 @@ export const login = createAsyncThunk(
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || "Login failed");
+    }
+  },
+);
+
+export const googleLogin = createAsyncThunk(
+  "auth/googleLogin",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await googleLoginUser(data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || "Google login failed");
+    }
+  },
+);
+
+export const googleSignup = createAsyncThunk(
+  "auth/googleSignup",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await googleSignupUser(data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || "Google signup failed");
     }
   },
 );
@@ -128,6 +154,37 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
       })
       .addCase(login.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    builder
+    
+      .addCase(googleLogin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(googleLogin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.isAuthenticated = true;
+      })
+      .addCase(googleLogin.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    builder
+      .addCase(googleSignup.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(googleSignup.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.isAuthenticated = true;
+      })
+      .addCase(googleSignup.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

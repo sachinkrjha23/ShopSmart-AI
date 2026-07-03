@@ -5,6 +5,7 @@ import { closeLoginModal, openRegisterModal } from '../../store/slices/uiSlice'
 import Modal from '../ui/Modal'
 import Input from '../ui/Input'
 import Button from '../ui/Button'
+import GoogleLoginButton from './GoogleLoginButton'
 import { toast } from 'react-hot-toast'
 
 const LoginModal = () => {
@@ -67,9 +68,19 @@ const LoginModal = () => {
           placeholder="Enter your password"
           required
         />
+
         <Button type="submit" fullWidth disabled={loading}>
           {loading ? 'Logging in...' : 'Login'}
         </Button>
+
+        <div className="flex items-center gap-3 my-2">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-xs text-gray-400 uppercase">or</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
+
+        <GoogleLoginButton mode="login" />
+
         <p className="text-sm text-center text-gray-600">
           Don't have an account?{' '}
           <button

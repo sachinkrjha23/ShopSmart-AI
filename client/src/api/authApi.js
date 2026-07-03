@@ -17,3 +17,7 @@ export const forgotPassword = (data) =>
 
 export const resetPassword = (token, data) =>
   axiosInstance.put(`/api/v1/auth/password/reset/${token}`, data)
+
+export const googleLoginUser = (data) => axiosInstance.post('/api/v1/auth/google/login', data)
+
+export const googleSignupUser = (data) => axiosInstance.post('/api/v1/auth/google/signup', data)

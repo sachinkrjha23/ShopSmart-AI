@@ -1,9 +1,8 @@
 import database from "../database/db.js";
 
-export async function createUserTable(){
-
-    try{
-        const query = `
+export async function createUserTable() {
+  try {
+    const query = `
             CREATE TABLE IF NOT EXISTS users(
                 id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                 name VARCHAR(100) NOT NULL CHECK (char_length(name) >= 3),
@@ -16,10 +15,27 @@ export async function createUserTable(){
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `;
-        await database.query(query);
-    }
-    catch(error){
-        console.log("❌ Failed To Create Users Table.", error);
-        process.exit(1);
-    }
+    await database.query(query);
+
+    await database.query(
+      `ALTER TABLE users ALTER COLUMN password DROP NOT NULL;`,
+    );
+    await database.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) UNIQUE;`,
+    );
+
+    // Password required unless it's a Google account
+    await database.query(`
+      DO $$
+      BEGIN
+        ALTER TABLE users ADD CONSTRAINT users_password_required_unless_google
+          CHECK (google_id IS NOT NULL OR password IS NOT NULL);
+      EXCEPTION
+        WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+  } catch (error) {
+    console.log("❌ Failed To Create Users Table.", error);
+    process.exit(1);
+  }
 }

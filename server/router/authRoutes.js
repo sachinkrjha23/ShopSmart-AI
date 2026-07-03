@@ -1,6 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import {getUser,login,logout,register, forgotPassword, resetPassword, updatePassword, updateProfile} from "../controllers/authControllers.js";
+import {getUser,login,logout,register, forgotPassword, resetPassword, updatePassword, updateProfile, googleLogin, googleSignup} from "../controllers/authControllers.js";
 import { isAuthenticated } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -38,6 +38,8 @@ const forgotPasswordLimiter = rateLimit({
 
 router.post("/register",registerLimiter, register);
 router.post("/login",authLimiter, login);
+router.post("/google/login", authLimiter, googleLogin);
+router.post("/google/signup", authLimiter, googleSignup);
 router.post("/password/forgot",forgotPasswordLimiter, forgotPassword);
 
 

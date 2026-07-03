@@ -5,6 +5,8 @@ export const sendToken = (user, statusCode, message, res) => {
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
 
+  const { password, ...safeUser } = user;
+
   res
     .status(statusCode)
     .cookie("token", token, {
@@ -15,7 +17,7 @@ export const sendToken = (user, statusCode, message, res) => {
     })
     .json({
       success: true,
-      user,
+      user: safeUser,
       message,
       token,
     });
