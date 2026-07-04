@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useDispatch } from 'react-redux'
 import { googleLogin, googleSignup } from '../../store/slices/authSlice'
+import { toast } from 'react-hot-toast'
 
 let googleScriptPromise = null
 
@@ -24,21 +25,29 @@ const loadGoogleScript = () => {
   return googleScriptPromise
 }
 
-const GoogleLoginButton = ({ mode = 'login' }) => {
+const GoogleLoginButton = ({ mode = 'login', onSuccess }) => {
   const dispatch = useDispatch()
   const buttonRef = useRef(null)
-  const hasRenderedRef = useRef(false) // guards against double init/render
+  const hasRenderedRef = useRef(false)
 
   const handleCredentialResponse = useCallback(
-    (response) => {
+    async (response) => {
       if (!response?.credential) return
-      if (mode === 'signup') {
-        dispatch(googleSignup({ credential: response.credential }))
-      } else {
-        dispatch(googleLogin({ credential: response.credential }))
+
+      try {
+        if (mode === 'signup') {
+          await dispatch(googleSignup({ credential: response.credential })).unwrap()
+          toast.success('Account created with Google!')
+        } else {
+          await dispatch(googleLogin({ credential: response.credential })).unwrap()
+          toast.success('Logged in with Google!')
+        }
+        onSuccess?.()
+      } catch (err) {
+        toast.error(err || 'Google authentication failed')
       }
     },
-    [dispatch, mode],
+    [dispatch, mode, onSuccess],
   )
 
   useEffect(() => {
@@ -49,8 +58,6 @@ const GoogleLoginButton = ({ mode = 'login' }) => {
         if (cancelled || !buttonRef.current || hasRenderedRef.current) return
         hasRenderedRef.current = true
 
-        // clear container first, in case of any leftover render from a
-        // fast-refresh / effect re-run scenario
         buttonRef.current.innerHTML = ''
 
         google.accounts.id.initialize({
@@ -73,9 +80,8 @@ const GoogleLoginButton = ({ mode = 'login' }) => {
 
     return () => {
       cancelled = true
-      hasRenderedRef.current = false
       if (window.google?.accounts?.id) {
-        window.google.accounts.id.cancel() // dismiss any pending Google UI on unmount
+        window.google.accounts.id.cancel()
       }
     }
   }, [handleCredentialResponse, mode])

@@ -1,47 +1,42 @@
-import { useState, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { login } from '../../store/slices/authSlice'
-import { closeLoginModal, openRegisterModal } from '../../store/slices/uiSlice'
-import Modal from '../ui/Modal'
-import Input from '../ui/Input'
-import Button from '../ui/Button'
-import GoogleLoginButton from './GoogleLoginButton'
-import { toast } from 'react-hot-toast'
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { login } from "../../store/slices/authSlice";
+import { closeLoginModal, openRegisterModal } from "../../store/slices/uiSlice";
+import Modal from "../ui/Modal";
+import Input from "../ui/Input";
+import Button from "../ui/Button";
+import GoogleLoginButton from "./GoogleLoginButton";
+import { toast } from "react-hot-toast";
 
 const LoginModal = () => {
-  const dispatch = useDispatch()
-  const { isLoginModalOpen } = useSelector((state) => state.ui)
-  const { loading, error, isAuthenticated } = useSelector((state) => state.auth)
+  const dispatch = useDispatch();
+  const { isLoginModalOpen } = useSelector((state) => state.ui);
+  const { loading } = useSelector((state) => state.auth);
 
-  const [formData, setFormData] = useState({ email: '', password: '' })
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      dispatch(closeLoginModal())
-      toast.success('Logged in successfully!')
-    }
-  }, [isAuthenticated])
-
-  useEffect(() => {
-    if (error) toast.error(error)
-  }, [error])
+  const [formData, setFormData] = useState({ email: "", password: "" });
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!formData.email || !formData.password) {
-      return toast.error('Please fill in all fields')
+      return toast.error("Please fill in all fields");
     }
-    dispatch(login(formData))
-  }
+    try {
+      await dispatch(login(formData)).unwrap();
+      dispatch(closeLoginModal());
+      toast.success("Logged in successfully!");
+    } catch (err) {
+      toast.error(err || "Login failed");
+    }
+  };
 
   const switchToRegister = () => {
-    dispatch(closeLoginModal())
-    dispatch(openRegisterModal())
-  }
+    dispatch(closeLoginModal());
+    dispatch(openRegisterModal());
+  };
 
   return (
     <Modal
@@ -70,7 +65,7 @@ const LoginModal = () => {
         />
 
         <Button type="submit" fullWidth disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
+          {loading ? "Logging in..." : "Login"}
         </Button>
 
         <div className="flex items-center gap-3 my-2">
@@ -79,10 +74,13 @@ const LoginModal = () => {
           <div className="h-px flex-1 bg-gray-200" />
         </div>
 
-        <GoogleLoginButton mode="login" />
+        <GoogleLoginButton
+          mode="login"
+          onSuccess={() => dispatch(closeLoginModal())}
+        />
 
         <p className="text-sm text-center text-gray-600">
-          Don't have an account?{' '}
+          Don't have an account?{" "}
           <button
             type="button"
             onClick={switchToRegister}
@@ -93,7 +91,7 @@ const LoginModal = () => {
         </p>
       </form>
     </Modal>
-  )
-}
+  );
+};
 
-export default LoginModal
+export default LoginModal;

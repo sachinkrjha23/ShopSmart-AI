@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './slices/authSlice'
-import cartReducer from './slices/cartSlice'
+import cartReducer, { getCartKey } from './slices/cartSlice'
 import productReducer from './slices/productSlice'
 import wishlistReducer from './slices/wishlistSlice'
 import orderReducer from './slices/orderSlice'
@@ -21,6 +21,26 @@ const store = configureStore({
     admin: adminReducer,
     ui: uiReducer,
   },
+})
+
+let lastPersistedSnapshot = null
+
+store.subscribe(() => {
+  const { cart } = store.getState()
+  const { currentUserId, items, totalQuantity, totalPrice } = cart
+
+  if (!currentUserId) return
+
+  const snapshot = JSON.stringify({ items, totalQuantity, totalPrice })
+  if (snapshot === lastPersistedSnapshot) return
+
+  lastPersistedSnapshot = snapshot
+
+  try {
+    localStorage.setItem(getCartKey(currentUserId), snapshot)
+  } catch (error) {
+    console.error('Failed to persist cart to localStorage:', error)
+  }
 })
 
 export default store

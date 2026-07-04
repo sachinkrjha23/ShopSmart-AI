@@ -1,59 +1,61 @@
-import { useState, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { register } from '../../store/slices/authSlice'
-import { closeRegisterModal, openLoginModal } from '../../store/slices/uiSlice'
-import Modal from '../ui/Modal'
-import Input from '../ui/Input'
-import Button from '../ui/Button'
-import GoogleLoginButton from './GoogleLoginButton'
-import { toast } from 'react-hot-toast'
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { register } from "../../store/slices/authSlice";
+import { closeRegisterModal, openLoginModal } from "../../store/slices/uiSlice";
+import Modal from "../ui/Modal";
+import Input from "../ui/Input";
+import Button from "../ui/Button";
+import GoogleLoginButton from "./GoogleLoginButton";
+import { toast } from "react-hot-toast";
 
 const RegisterModal = () => {
-  const dispatch = useDispatch()
-  const { isRegisterModalOpen } = useSelector((state) => state.ui)
-  const { loading, error, isAuthenticated } = useSelector((state) => state.auth)
+  const dispatch = useDispatch();
+  const { isRegisterModalOpen } = useSelector((state) => state.ui);
+  const { loading } = useSelector((state) => state.auth);
 
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  })
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      dispatch(closeRegisterModal())
-      toast.success('Account created successfully!')
-    }
-  }, [isAuthenticated])
-
-  useEffect(() => {
-    if (error) toast.error(error)
-  }, [error])
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      return toast.error('Please fill in all fields')
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (
+      !formData.name ||
+      !formData.email ||
+      !formData.password ||
+      !formData.confirmPassword
+    ) {
+      return toast.error("Please fill in all fields");
     }
     if (formData.password !== formData.confirmPassword) {
-      return toast.error('Passwords do not match')
+      return toast.error("Passwords do not match");
     }
-    dispatch(register({
-      name: formData.name,
-      email: formData.email,
-      password: formData.password,
-    }))
-  }
+    try {
+      await dispatch(
+        register({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      ).unwrap();
+      dispatch(closeRegisterModal());
+      toast.success("Account created successfully!");
+    } catch (err) {
+      toast.error(err || "Registration failed");
+    }
+  };
 
   const switchToLogin = () => {
-    dispatch(closeRegisterModal())
-    dispatch(openLoginModal())
-  }
+    dispatch(closeRegisterModal());
+    dispatch(openLoginModal());
+  };
 
   return (
     <Modal
@@ -98,7 +100,7 @@ const RegisterModal = () => {
           required
         />
         <Button type="submit" fullWidth disabled={loading}>
-          {loading ? 'Creating account...' : 'Register'}
+          {loading ? "Creating account..." : "Register"}
         </Button>
 
         <div className="flex items-center gap-3 my-2">
@@ -107,10 +109,13 @@ const RegisterModal = () => {
           <div className="h-px flex-1 bg-gray-200" />
         </div>
 
-        <GoogleLoginButton mode="signup" />
+        <GoogleLoginButton
+          mode="signup"
+          onSuccess={() => dispatch(closeRegisterModal())}
+        />
 
         <p className="text-sm text-center text-gray-600">
-          Already have an account?{' '}
+          Already have an account?{" "}
           <button
             type="button"
             onClick={switchToLogin}
@@ -121,7 +126,7 @@ const RegisterModal = () => {
         </p>
       </form>
     </Modal>
-  )
-}
+  );
+};
 
-export default RegisterModal
+export default RegisterModal;
