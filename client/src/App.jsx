@@ -46,6 +46,7 @@ import Settings from "./pages/admin/Settings";
 import Navbar from "./components/layout/Navbar";
 import LoginModal from "./components/auth/LoginModal";
 import RegisterModal from "./components/auth/RegisterModal";
+import CartDrawer from "./components/layout/CartDrawer";   
 import { Toaster } from "react-hot-toast";
 
 const App = () => {
@@ -57,10 +58,11 @@ const App = () => {
 
   return (
     <>
-    <Toaster position="top-right" />
+      <Toaster position="top-right" />
       <Navbar />
       <LoginModal />
       <RegisterModal />
+      <CartDrawer />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Home />} />
@@ -289,5 +291,5 @@ const App = () => {
     </>
   );
 };
-     
+
 export default App;

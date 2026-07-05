@@ -18,7 +18,6 @@ export const sendToken = (user, statusCode, message, res) => {
     .json({
       success: true,
       user: safeUser,
-      message,
-      token,
+      message
     });
 };

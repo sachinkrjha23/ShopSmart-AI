@@ -3,17 +3,28 @@ import { toast } from 'react-hot-toast'
 import StarRating from '../ui/StarRating'
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
+import useCart from '../../hooks/useCart'
 
 const ProductCard = ({ product }) => {
   const productImage = product.images?.[0]?.url || null
   const isInStock = product.stock > 0
   const isLowStock = product.stock > 0 && product.stock <= 5
+  const { addItem, decreaseQuantity, isInCart, getItemQuantity } = useCart()
+
+  const cartQuantity = getItemQuantity(product.id)
+  const cap = Math.min(product.stock ?? 100, 100)
 
   const handleAddToCart = (e) => {
     e.preventDefault()
     e.stopPropagation()
     if (!isInStock) return toast.error('Product is out of stock')
-    toast('Cart coming soon!', { icon: '🛒' })
+    addItem(product)
+  }
+
+  const handleDecrease = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    decreaseQuantity(product.id)
   }
 
   const formatPrice = (price) => {
@@ -26,7 +37,6 @@ const ProductCard = ({ product }) => {
 
   return (
     <div className="group relative bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-100 hover:border-indigo-200">
-      {/* Product Image */}
       <Link to={`/products/${product.id}`} className="block">
         <div className="relative aspect-square overflow-hidden bg-gray-100">
           <img
@@ -37,7 +47,6 @@ const ProductCard = ({ product }) => {
             onError={(e) => { e.target.style.display = 'none' }}
           />
 
-          {/* Badges */}
           <div className="absolute top-3 left-3 flex flex-col gap-2">
             {!isInStock && <Badge label="Out of Stock" variant="danger" />}
             {isLowStock && isInStock && <Badge label="Low Stock" variant="warning" />}
@@ -46,7 +55,6 @@ const ProductCard = ({ product }) => {
         </div>
       </Link>
 
-      {/* Product Info */}
       <div className="p-4">
         <Link to={`/products/${product.id}`} className="block">
           <h3 className="text-sm font-medium text-gray-800 hover:text-indigo-600 transition-colors line-clamp-2 min-h-10">
@@ -68,19 +76,42 @@ const ProductCard = ({ product }) => {
             {formatPrice(product.price)}
           </span>
 
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleAddToCart}
-            disabled={!isInStock}
-            className="px-3 py-1.5 text-xs"
-          >
-            {!isInStock ? 'Out of Stock' : 'Add to Cart'}
-          </Button>
+          {isInCart(product.id) ? (
+            <div className="flex items-center border border-gray-200 rounded-lg">
+              <button
+                type="button"
+                onClick={handleDecrease}
+                className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-sm"
+                aria-label="Decrease quantity"
+              >
+                −
+              </button>
+              <span className="w-7 text-center text-xs font-medium">{cartQuantity}</span>
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={cartQuantity >= cap}
+                className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed text-sm"
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleAddToCart}
+              disabled={!isInStock}
+              className="px-3 py-1.5 text-xs"
+            >
+              {!isInStock ? 'Out of Stock' : 'Add to Cart'}
+            </Button>
+          )}
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ProductCard
+export default ProductCard;

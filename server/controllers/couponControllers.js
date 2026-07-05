@@ -104,8 +104,8 @@ export const validateCoupon = catchAsyncErrors(async (req, res, next) => {
       discountValue: coupon.discount_value,
     },
     discountAmount: discountAmount.toFixed(2),
-    finalAmount: finalAmount.toFixed(2),
     cartTotal: parseFloat(cartTotal).toFixed(2),
+    finalAmount: finalAmount.toFixed(2),
   });
 });
 
