@@ -1,24 +1,26 @@
-import { useSelector } from 'react-redux'
-import { Link } from 'react-router-dom'
-import CartItem from '../components/cart/CartItem'
-import CartSummary from '../components/cart/CartSummary'
-import Button from '../components/ui/Button'
+import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
+import CartItem from "../components/cart/CartItem";
+import CartSummary from "../components/cart/CartSummary";
+import Button from "../components/ui/Button";
 
 const Cart = () => {
-  const { items } = useSelector((state) => state.cart)
-
+  const { items } = useSelector((state) => state.cart);
   if (items.length === 0) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-4">
-        <h2 className="text-xl font-semibold text-gray-700">Your cart is empty</h2>
-        <p className="text-sm text-gray-500">Looks like you haven't added anything yet.</p>
+        <h2 className="text-xl font-semibold text-gray-700">
+          Your cart is empty
+        </h2>
+        <p className="text-sm text-gray-500">
+          Looks like you haven't added anything yet.
+        </p>
         <Link to="/products">
           <Button variant="primary">Start Shopping</Button>
         </Link>
       </div>
-    )
+    );
   }
-
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Shopping Cart</h1>
@@ -33,7 +35,6 @@ const Cart = () => {
         </div>
       </div>
     </div>
-  )
-}
-
-export default Cart
+  );
+};
+export default Cart;

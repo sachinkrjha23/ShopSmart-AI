@@ -215,10 +215,7 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
         coupon.usage_limit !== null &&
         coupon.used_count >= coupon.usage_limit
       ) {
-        throw new ErrorHandler(
-          "This coupon has reached its usage limit.",
-          400,
-        );
+        throw new ErrorHandler("This coupon has reached its usage limit.", 400);
       }
 
       // Check per-user limit — inside transaction for accuracy
@@ -342,7 +339,8 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       success: true,
       orderId: order.id,
       razorpayOrderId: razorpayOrder.id,
-      amount: `₹${(razorpayOrder.amount / 100).toLocaleString("en-IN")}`,
+      amount: razorpayOrder.amount, // raw paise — required by Razorpay's checkout widget
+      displayAmount: `₹${(razorpayOrder.amount / 100).toLocaleString("en-IN")}`,
       currency: "INR",
       keyId: process.env.RAZORPAY_FRONTEND_KEY,
       couponApplied: appliedCouponId ? true : false,

@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { register } from "../../store/slices/authSlice";
+import {
+  register,
+  resendVerification,
+  clearRegistrationMessage,
+} from "../../store/slices/authSlice";
 import { closeRegisterModal, openLoginModal } from "../../store/slices/uiSlice";
 import Modal from "../ui/Modal";
 import Input from "../ui/Input";
@@ -11,7 +15,7 @@ import { toast } from "react-hot-toast";
 const RegisterModal = () => {
   const dispatch = useDispatch();
   const { isRegisterModalOpen } = useSelector((state) => state.ui);
-  const { loading } = useSelector((state) => state.auth);
+  const { loading, registrationMessage } = useSelector((state) => state.auth);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -19,6 +23,12 @@ const RegisterModal = () => {
     password: "",
     confirmPassword: "",
   });
+
+  useEffect(() => {
+    if (isRegisterModalOpen) {
+      dispatch(clearRegistrationMessage());
+    }
+  }, [isRegisterModalOpen]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -45,10 +55,17 @@ const RegisterModal = () => {
           password: formData.password,
         }),
       ).unwrap();
-      dispatch(closeRegisterModal());
-      toast.success("Account created successfully!");
     } catch (err) {
       toast.error(err || "Registration failed");
+    }
+  };
+
+  const handleResend = async () => {
+    try {
+      await dispatch(resendVerification({ email: formData.email })).unwrap();
+      toast.success("Verification email resent!");
+    } catch (err) {
+      toast.error(err || "Failed to resend email");
     }
   };
 
@@ -56,6 +73,31 @@ const RegisterModal = () => {
     dispatch(closeRegisterModal());
     dispatch(openLoginModal());
   };
+
+  if (registrationMessage) {
+    return (
+      <Modal
+        isOpen={isRegisterModalOpen}
+        onClose={() => dispatch(closeRegisterModal())}
+        title="Check Your Email"
+      >
+        <div className="flex flex-col items-center gap-4 py-4 text-center">
+          <p className="text-sm text-gray-600">{registrationMessage}</p>
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={loading}
+            className="text-xs text-indigo-600 hover:underline"
+          >
+            {loading ? "Sending..." : "Didn't get the email? Resend"}
+          </button>
+          <Button onClick={switchToLogin} variant="primary">
+            Go to Login
+          </Button>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal

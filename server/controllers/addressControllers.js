@@ -353,50 +353,47 @@ export const setDefaultAddress = catchAsyncErrors(async (req, res, next) => {
 
 //  Delete Address
 export const deleteAddress = catchAsyncErrors(async (req, res, next) => {
-  if (!isValidUUID(req.params.id)) {
-    return next(new ErrorHandler("Invalid address ID.", 400));
-  }
 
-  // 1. Check address belongs to user
-  const existing = await database.query(
-    `SELECT * FROM user_addresses WHERE id = $1 AND user_id = $2`,
-    [req.params.id, req.user.id],
-  );
+    if (!isValidUUID(req.params.id)) {
+        return next(new ErrorHandler("Invalid address ID.", 400));
+    }
 
-  if (existing.rows.length === 0) {
-    return next(new ErrorHandler("Address not found.", 404));
-  }
-
-  // 2. Delete
-  await database.query(
-    `DELETE FROM user_addresses WHERE id = $1 AND user_id = $2`,
-    [req.params.id, req.user.id],
-  );
-
-  // 3. If deleted address was default, make the most recent one default
-  if (existing.rows[0].is_default) {
-    await database.query(
-      `UPDATE user_addresses 
-             SET is_default = TRUE 
-             WHERE user_id = $1 
-             AND id = (
-                 SELECT id FROM user_addresses 
-                 WHERE user_id = $1 
-                 ORDER BY created_at DESC 
-                 LIMIT 1
-             )`,
-      [req.user.id],
+    // 1. Check address belongs to user
+    const existing = await database.query(
+        `SELECT * FROM user_addresses WHERE id = $1 AND user_id = $2`,
+        [req.params.id, req.user.id]
     );
-  }
 
-  const remaining = await database.query(
-    `SELECT COUNT(*) FROM user_addresses WHERE user_id = $1`,
-    [req.user.id],
-  );
+    if (existing.rows.length === 0) {
+        return next(new ErrorHandler("Address not found.", 404));
+    }
 
-  res.status(200).json({
-    success: true,
-    message: "Address deleted successfully.",
-    remainingAddresses: parseInt(remaining.rows[0].count),
-  });
+    // 2. Default address can NEVER be deleted directly — no exceptions,
+    // even if it's the only address left. User must set another address
+    // as default first (which requires adding one if none exist).
+    if (existing.rows[0].is_default) {
+        return next(
+            new ErrorHandler(
+                "Cannot delete your default address. Please add another address and set it as default first.",
+                400
+            )
+        );
+    }
+
+    // 3. Delete
+    await database.query(
+        `DELETE FROM user_addresses WHERE id = $1 AND user_id = $2`,
+        [req.params.id, req.user.id]
+    );
+
+    const remaining = await database.query(
+        `SELECT COUNT(*) FROM user_addresses WHERE user_id = $1`,
+        [req.user.id]
+    );
+
+    res.status(200).json({
+        success: true,
+        message: "Address deleted successfully.",
+        remainingAddresses: parseInt(remaining.rows[0].count),
+    });
 });

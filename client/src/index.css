@@ -67,3 +67,17 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-500;
 }
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a,
+select,
+input[type="submit"],
+input[type="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}

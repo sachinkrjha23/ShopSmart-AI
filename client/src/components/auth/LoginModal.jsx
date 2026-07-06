@@ -7,6 +7,7 @@ import Input from "../ui/Input";
 import Button from "../ui/Button";
 import GoogleLoginButton from "./GoogleLoginButton";
 import { toast } from "react-hot-toast";
+import { Link } from "react-router-dom";
 
 const LoginModal = () => {
   const dispatch = useDispatch();
@@ -63,6 +64,16 @@ const LoginModal = () => {
           placeholder="Enter your password"
           required
         />
+
+        <div className="flex justify-end -mt-2">
+          <Link
+            to="/forgot-password"
+            onClick={() => dispatch(closeLoginModal())}
+            className="text-xs text-indigo-600 hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
 
         <Button type="submit" fullWidth disabled={loading}>
           {loading ? "Logging in..." : "Login"}

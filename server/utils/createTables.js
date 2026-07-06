@@ -10,6 +10,8 @@ import { createWishlistTable } from "../models/wishlistTable.js";
 import { createAddressTable } from "../models/addressTable.js";
 import { createCouponTables } from "../models/couponTable.js";
 import { createCategoriesTable } from "../models/categoryTable.js"; 
+import { createPendingRegistrationsTable } from "../models/pendingRegistrationsTable.js";
+
 
 
 
@@ -31,6 +33,8 @@ export const createTables = async() =>{
         await createWishlistTable();
         await createAddressTable();
         await createCouponTables();
+        await createPendingRegistrationsTable();
+
 
         await database.query(`
             CREATE TABLE IF NOT EXISTS webhook_logs (

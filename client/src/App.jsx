@@ -30,6 +30,8 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import ReturnPolicy from "./pages/ReturnPolicy";
 import NotFound from "./pages/NotFound";
+import VerifyEmail from "./pages/VerifyEmail";
+
 
 // Pages - Admin
 import Dashboard from "./pages/admin/Dashboard";
@@ -86,6 +88,9 @@ const App = () => {
         <Route path="/terms" element={<TermsAndConditions />} />
 
         <Route path="/return-policy" element={<ReturnPolicy />} />
+
+        <Route path="/verify-email/:token" element={<VerifyEmail />} />
+
 
         {/* ****************************************************************** */}
 

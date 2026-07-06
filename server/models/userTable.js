@@ -34,6 +34,22 @@ export async function createUserTable() {
         WHEN duplicate_object THEN NULL;
       END $$;
     `);
+
+    // NEW — email verification columns
+    await database.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN DEFAULT FALSE;`,
+    );
+    await database.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token TEXT DEFAULT NULL;`,
+    );
+    await database.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expire TIMESTAMP DEFAULT NULL;`,
+    );
+
+    await database.query(`
+      UPDATE users SET is_email_verified = TRUE 
+      WHERE is_email_verified = FALSE AND email_verification_token IS NULL;
+    `);
   } catch (error) {
     console.log("❌ Failed To Create Users Table.", error);
     process.exit(1);

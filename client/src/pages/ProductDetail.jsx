@@ -18,7 +18,6 @@ const ProductDetail = () => {
   const { isAuthenticated } = useSelector((state) => state.auth);
 
   const [selectedImage, setSelectedImage] = useState(0);
-  const [quantity, setQuantity] = useState(1);
   const { addItem, decreaseQuantity, getItemQuantity } = useCart();
 
   const cartQuantity = getItemQuantity(id);
@@ -32,13 +31,9 @@ const ProductDetail = () => {
     setSelectedImage(0);
   }, [product?.id]);
 
-  useEffect(() => {
-    setQuantity(1);
-  }, [product?.id, cartQuantity]);
-
   const handleAddToCart = () => {
     if (!isInStock) return toast.error("Product is out of stock");
-    addItem(product, quantity);
+    addItem(product);
   };
 
   const handleDecrease = () => {
@@ -49,11 +44,6 @@ const ProductDetail = () => {
     if (!isAuthenticated) return toast.error("Please login to add to wishlist");
     // TODO Phase 6: dispatch(addToWishlist(id))
     toast("Wishlist coming soon!", { icon: "♡" });
-  };
-
-  const handleQuantityChange = (type) => {
-    if (type === "dec" && quantity > 1) setQuantity((q) => q - 1);
-    if (type === "inc" && quantity < product.stock) setQuantity((q) => q + 1);
   };
 
   const formatPrice = (price) => {
@@ -194,36 +184,6 @@ const ProductDetail = () => {
               </p>
 
               <hr className="border-gray-100" />
-
-              {isInStock && cartQuantity === 0 && (
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium text-gray-700">
-                    Quantity
-                  </span>
-                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => handleQuantityChange("dec")}
-                      disabled={quantity <= 1}
-                      className="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                    >
-                      −
-                    </button>
-                    <span className="px-4 py-2 text-sm font-medium text-gray-800 border-x border-gray-200">
-                      {quantity}
-                    </span>
-                    <button
-                      onClick={() => handleQuantityChange("inc")}
-                      disabled={quantity >= product.stock}
-                      className="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <span className="text-xs text-gray-400">
-                    {product.stock} available
-                  </span>
-                </div>
-              )}
 
               <div className="flex gap-3 mt-2">
                 {cartQuantity > 0 ? (

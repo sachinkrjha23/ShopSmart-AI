@@ -1,6 +1,12 @@
 import axiosInstance from '../lib/axios'
 
-export const registerUser = (data) => axiosInstance.post('/api/v1/auth/register', data)
+export const registerUser = (data) =>
+  axiosInstance.post(`/api/v1/auth/register?frontendUrl=${window.location.origin}`, data)
+
+export const verifyEmailToken = (token) => axiosInstance.get(`/api/v1/auth/verify-email/${token}`)
+
+export const resendVerificationEmail = (data) =>
+  axiosInstance.post(`/api/v1/auth/resend-verification?frontendUrl=${window.location.origin}`, data)
 
 export const loginUser = (data) => axiosInstance.post('/api/v1/auth/login', data)
 

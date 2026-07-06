@@ -1,15 +1,24 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
-import { applyCoupon, removeCoupon } from "../../store/slices/couponSlice";
+import { applyCoupon, removeCoupon, clearPendingCode } from "../../store/slices/couponSlice";
 
 const CouponInput = () => {
   const dispatch = useDispatch();
   const [code, setCode] = useState("");
   const { totalPrice } = useSelector((state) => state.cart);
-  const { coupon, discount, loading, error, appliedForTotal } = useSelector(
+  const { coupon, discount, loading, error, appliedForTotal, pendingCode } = useSelector(
     (state) => state.coupon,
   );
+
+  useEffect(() => {
+    if (pendingCode && !coupon && totalPrice > 0) {
+      dispatch(applyCoupon({ code: pendingCode, cartTotal: totalPrice }))
+        .unwrap()
+        .catch(() => {})
+        .finally(() => dispatch(clearPendingCode()));
+    }
+  }, [pendingCode, totalPrice]);
 
   useEffect(() => {
     if (coupon && appliedForTotal !== null && appliedForTotal !== totalPrice) {

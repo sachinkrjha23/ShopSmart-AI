@@ -13,22 +13,31 @@ import { v2 as cloudinary } from "cloudinary";
 import { OAuth2Client } from "google-auth-library";
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+const generateVerificationToken = () => {
+  const verificationToken = crypto.randomBytes(20).toString("hex");
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(verificationToken)
+    .digest("hex");
+  const expireTime = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  return { verificationToken, hashedToken, expireTime };
+};
+
 export const register = catchAsyncErrors(async (req, res, next) => {
   const { name, email, password } = req.body;
+  const { frontendUrl } = req.query;
 
-  // 1. Check required fields
   if (!name || !email || !password) {
     return next(new ErrorHandler("Please provide all required fields.", 400));
   }
-
-  // 2. Validate name
+  if (!frontendUrl) {
+    return next(new ErrorHandler("Frontend URL is required.", 400));
+  }
   if (name.length < 3 || name.length > 50) {
     return next(
       new ErrorHandler("Name must be between 2 and 50 characters.", 400),
     );
   }
-
-  // 3. ✅ VALIDATE EMAIL WITH VALIDATOR (NO REGEX NEEDED!)
   if (!validator.isEmail(email)) {
     return next(new ErrorHandler("Please provide a valid email address.", 400));
   }
@@ -38,7 +47,6 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler(passwordErrors[0], 400));
   }
 
-  // 5. Check if email already registered
   const isAlreadyRegistered = await database.query(
     `SELECT * FROM users WHERE email = $1`,
     [email],
@@ -50,14 +58,36 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  // 6. Hash password and create user
   const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await database.query(
-    "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
-    [name, email, hashedPassword],
+  const { verificationToken, hashedToken, expireTime } =
+    generateVerificationToken();
+
+  await database.query(`DELETE FROM pending_registrations WHERE email = $1`, [
+    email,
+  ]);
+
+  await database.query(
+    `INSERT INTO pending_registrations (name, email, password, verification_token, expires_at)
+     VALUES ($1, $2, $3, $4, to_timestamp($5))`,
+    [name, email, hashedPassword, hashedToken, expireTime / 1000],
   );
 
-  sendToken(user.rows[0], 201, "User registered successfully", res);
+  const verifyUrl = `${frontendUrl}/verify-email/${verificationToken}`;
+
+  try {
+    await sendEmail({
+      email,
+      subject: "ShopSmart-AI - Verify Your Email",
+      message: `<p>Welcome to ShopSmart-AI! Please verify your email to complete registration:</p><a href="${verifyUrl}">${verifyUrl}</a><p>This link expires in 24 hours.</p>`,
+    });
+  } catch (error) {
+    console.error("Failed to send verification email:", error.message);
+  }
+
+  res.status(201).json({
+    success: true,
+    message: `Almost there! Please check ${email} to verify your email and complete registration.`,
+  });
 });
 
 export const login = catchAsyncErrors(async (req, res, next) => {
@@ -93,6 +123,108 @@ export const login = catchAsyncErrors(async (req, res, next) => {
   sendToken(user.rows[0], 200, "Logged In.", res);
 });
 
+export const verifyEmail = catchAsyncErrors(async (req, res, next) => {
+  const { token } = req.params;
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const pending = await database.query(
+    `SELECT * FROM pending_registrations WHERE verification_token = $1 AND expires_at > NOW()`,
+    [hashedToken],
+  );
+
+  if (pending.rows.length === 0) {
+    return next(new ErrorHandler("Invalid or expired verification link.", 400));
+  }
+
+  const { name, email, password } = pending.rows[0];
+
+  const alreadyExists = await database.query(
+    `SELECT id FROM users WHERE email = $1`,
+    [email],
+  );
+  if (alreadyExists.rows.length > 0) {
+    await database.query(`DELETE FROM pending_registrations WHERE id = $1`, [
+      pending.rows[0].id,
+    ]);
+    return next(
+      new ErrorHandler("This email is already registered. Please login.", 400),
+    );
+  }
+
+  const newUser = await database.query(
+    `INSERT INTO users (name, email, password, is_email_verified)
+     VALUES ($1, $2, $3, TRUE)
+     RETURNING *`,
+    [name, email, password],
+  );
+
+  await database.query(`DELETE FROM pending_registrations WHERE id = $1`, [
+    pending.rows[0].id,
+  ]);
+
+  sendToken(
+    newUser.rows[0],
+    201,
+    "Email verified! Your account is ready.",
+    res,
+  );
+});
+
+export const resendVerification = catchAsyncErrors(async (req, res, next) => {
+  const { email } = req.body;
+  const { frontendUrl } = req.query;
+
+  if (!email || !validator.isEmail(email)) {
+    return next(new ErrorHandler("Please provide a valid email address.", 400));
+  }
+  if (!frontendUrl) {
+    return next(new ErrorHandler("Frontend URL is required.", 400));
+  }
+
+  const alreadyVerified = await database.query(
+    `SELECT id FROM users WHERE email = $1`,
+    [email],
+  );
+  if (alreadyVerified.rows.length > 0) {
+    return next(
+      new ErrorHandler("This email is already verified. Please login.", 400),
+    );
+  }
+
+  const pending = await database.query(
+    `SELECT * FROM pending_registrations WHERE email = $1`,
+    [email],
+  );
+  if (pending.rows.length === 0) {
+    return next(
+      new ErrorHandler(
+        "No pending registration found for this email. Please register first.",
+        404,
+      ),
+    );
+  }
+
+  const { verificationToken, hashedToken, expireTime } =
+    generateVerificationToken();
+
+  await database.query(
+    `UPDATE pending_registrations SET verification_token = $1, expires_at = to_timestamp($2) WHERE email = $3`,
+    [hashedToken, expireTime / 1000, email],
+  );
+
+  const verifyUrl = `${frontendUrl}/verify-email/${verificationToken}`;
+
+  await sendEmail({
+    email,
+    subject: "ShopSmart-AI - Verify Your Email",
+    message: `<p>Please verify your email to complete registration:</p><a href="${verifyUrl}">${verifyUrl}</a><p>This link expires in 24 hours.</p>`,
+  });
+
+  res
+    .status(200)
+    .json({ success: true, message: `Verification email resent to ${email}.` });
+});
+
 const verifyGoogleCredential = async (credential) => {
   const ticket = await googleClient.verifyIdToken({
     idToken: credential,
@@ -123,7 +255,6 @@ export const googleLogin = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  // 1. Already linked to this Google account
   let userResult = await database.query(
     `SELECT * FROM users WHERE google_id = $1`,
     [googleId],
@@ -133,9 +264,6 @@ export const googleLogin = catchAsyncErrors(async (req, res, next) => {
     return sendToken(userResult.rows[0], 200, "Logged in with Google.", res);
   }
 
-  // 2. Existing email/password account, not yet linked — this IS an existing
-  // account, so auto-link + login is correct here, not a violation of "login
-  // only works for existing accounts."
   userResult = await database.query(`SELECT * FROM users WHERE email = $1`, [
     email,
   ]);
@@ -153,7 +281,6 @@ export const googleLogin = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  // 3. No account at all — reject, don't silently create one
   return next(
     new ErrorHandler(
       "No account found with this email. Please sign up first.",
@@ -184,7 +311,6 @@ export const googleSignup = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  // Reject if this email is already registered in ANY form (password or Google)
   const existing = await database.query(
     `SELECT id FROM users WHERE email = $1 OR google_id = $2`,
     [email, googleId],
@@ -201,11 +327,13 @@ export const googleSignup = catchAsyncErrors(async (req, res, next) => {
 
   const rawName = name || email.split("@")[0];
   const safeName =
-    rawName.length >= 3 ? rawName.slice(0, 100) : rawName.padEnd(3, "_").slice(0, 100);
+    rawName.length >= 3
+      ? rawName.slice(0, 100)
+      : rawName.padEnd(3, "_").slice(0, 100);
 
   const newUser = await database.query(
-    `INSERT INTO users (name, email, google_id, avatar)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (name, email, google_id, avatar, is_email_verified)
+     VALUES ($1, $2, $3, $4, TRUE)
      RETURNING *`,
     [
       safeName,
@@ -243,12 +371,10 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
   const { email } = req.body;
   const { frontendUrl } = req.query;
 
-  // ✅ Validate email format
   if (!email || !validator.isEmail(email)) {
     return next(new ErrorHandler("Please provide a valid email address.", 400));
   }
 
-  // ✅ ADD THIS CHECK
   if (!frontendUrl) {
     return next(new ErrorHandler("Frontend URL is required.", 400));
   }
@@ -271,7 +397,7 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
     [hashedToken, resetPasswordExpireTime / 1000, email],
   );
 
-  const resetPasswordUrl = `${frontendUrl}/password/reset/${resetToken}`;
+  const resetPasswordUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
   const message = generateEmailTemplate(resetPasswordUrl);
 
@@ -312,14 +438,12 @@ export const resetPassword = catchAsyncErrors(async (req, res, next) => {
 
   const { password, confirmPassword } = req.body;
 
-  // 1. Check if passwords exist
   if (!password || !confirmPassword) {
     return next(
       new ErrorHandler("Both password and confirm password are required.", 400),
     );
   }
 
-  // 2. Check if passwords match
   if (password !== confirmPassword) {
     return next(new ErrorHandler("Passwords do not match.", 400));
   }
@@ -391,17 +515,14 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
 export const updateProfile = catchAsyncErrors(async (req, res, next) => {
   const { name, email, removeAvatar } = req.body;
 
-  // 1. Validate user exists
   if (!req.user?.id) {
     return next(new ErrorHandler("User not authenticated.", 401));
   }
 
-  // 2. Validate required fields
   if (!name || !email) {
     return next(new ErrorHandler("Please provide all required fields.", 400));
   }
 
-  // 3. Trim and validate
   const trimmedName = name.trim();
   const trimmedEmail = email.trim();
 
@@ -419,7 +540,6 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Please provide a valid email address.", 400));
   }
 
-  // 4. Check if email is taken by another user
   const emailExists = await database.query(
     "SELECT id FROM users WHERE email = $1 AND id != $2",
     [trimmedEmail, req.user.id],
@@ -431,12 +551,10 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  // 5. Handle avatar operations
   const shouldRemoveAvatar = removeAvatar === "true" || removeAvatar === true;
   const hasNewAvatar = req.files?.avatar;
-  let newAvatarData = null; // null = no change, 'remove' = remove, object = new avatar
+  let newAvatarData = null;
 
-  // 5a. Validate new avatar if present
   if (hasNewAvatar) {
     const { avatar } = req.files;
 
@@ -456,7 +574,6 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
     }
   }
 
-  // 6. Perform database update with transaction
   const client = await database.connect();
 
   try {
@@ -465,7 +582,6 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
     let user;
     let oldAvatarPublicId = req.user?.avatar?.public_id || null;
 
-    // 6a. Upload new avatar if provided (outside transaction but before DB update)
     if (hasNewAvatar) {
       try {
         const { avatar } = req.files;
@@ -491,7 +607,6 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
       }
     }
 
-    // 6b. Determine avatar operation for DB
     let avatarOperation;
     if (shouldRemoveAvatar) {
       avatarOperation = "REMOVE";
@@ -501,7 +616,6 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
       avatarOperation = "KEEP";
     }
 
-    // 6c. Update database
     let query, params;
 
     switch (avatarOperation) {
@@ -547,7 +661,6 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
 
     await client.query("COMMIT");
 
-    // 7. Clean up old avatar files (after successful transaction)
     if (shouldRemoveAvatar && oldAvatarPublicId) {
       try {
         await cloudinary.uploader.destroy(oldAvatarPublicId);
@@ -564,7 +677,6 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
       }
     }
 
-    // 8. Send response
     res.status(200).json({
       success: true,
       message: "Profile updated successfully.",
@@ -573,7 +685,6 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
   } catch (error) {
     await client.query("ROLLBACK");
 
-    // Clean up newly uploaded avatar if transaction failed
     if (newAvatarData) {
       try {
         await cloudinary.uploader.destroy(newAvatarData.public_id);
