@@ -32,7 +32,6 @@ import ReturnPolicy from "./pages/ReturnPolicy";
 import NotFound from "./pages/NotFound";
 import VerifyEmail from "./pages/VerifyEmail";
 
-
 // Pages - Admin
 import Dashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
@@ -48,15 +47,26 @@ import Settings from "./pages/admin/Settings";
 import Navbar from "./components/layout/Navbar";
 import LoginModal from "./components/auth/LoginModal";
 import RegisterModal from "./components/auth/RegisterModal";
-import CartDrawer from "./components/layout/CartDrawer";   
+import CartDrawer from "./components/layout/CartDrawer";
 import { Toaster } from "react-hot-toast";
+import { fetchWishlist } from "./store/slices/wishlistSlice";
+import { useSelector } from "react-redux";
 
 const App = () => {
   const dispatch = useDispatch();
+  const { isAuthenticated, sessionChecked } = useSelector(
+    (state) => state.auth,
+  );
 
   useEffect(() => {
     dispatch(fetchMe());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (sessionChecked && isAuthenticated) {
+      dispatch(fetchWishlist());
+    }
+  }, [sessionChecked, isAuthenticated, dispatch]);
 
   return (
     <>
@@ -90,7 +100,6 @@ const App = () => {
         <Route path="/return-policy" element={<ReturnPolicy />} />
 
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
-
 
         {/* ****************************************************************** */}
 

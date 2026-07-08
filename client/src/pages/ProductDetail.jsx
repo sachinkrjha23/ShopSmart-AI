@@ -8,6 +8,7 @@ import Breadcrumb from "../components/ui/Breadcrumb";
 import Loader from "../components/ui/Loader";
 import ReviewCard from "../components/product/ReviewCard";
 import useCart from "../hooks/useCart";
+import WishlistButton from "../components/wishlist/WishlistButton";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -15,7 +16,6 @@ const ProductDetail = () => {
   const { singleProduct: product, loading } = useSelector(
     (state) => state.product,
   );
-  const { isAuthenticated } = useSelector((state) => state.auth);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const { addItem, decreaseQuantity, getItemQuantity } = useCart();
@@ -38,12 +38,6 @@ const ProductDetail = () => {
 
   const handleDecrease = () => {
     decreaseQuantity(id);
-  };
-
-  const handleWishlist = () => {
-    if (!isAuthenticated) return toast.error("Please login to add to wishlist");
-    // TODO Phase 6: dispatch(addToWishlist(id))
-    toast("Wishlist coming soon!", { icon: "♡" });
   };
 
   const formatPrice = (price) => {
@@ -217,25 +211,7 @@ const ProductDetail = () => {
                   </button>
                 )}
 
-                <button
-                  onClick={handleWishlist}
-                  className="px-4 py-3 border border-gray-200 rounded-xl text-gray-500 hover:text-red-500 hover:border-red-200 transition-colors"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                    />
-                  </svg>
-                </button>
+                <WishlistButton productId={id} variant="button" />
               </div>
             </div>
           </div>

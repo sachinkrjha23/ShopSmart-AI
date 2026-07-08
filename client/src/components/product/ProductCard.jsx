@@ -4,6 +4,7 @@ import StarRating from '../ui/StarRating'
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
 import useCart from '../../hooks/useCart'
+import WishlistButton from '../wishlist/WishlistButton'
 
 const ProductCard = ({ product }) => {
   const productImage = product.images?.[0]?.url || null
@@ -52,6 +53,11 @@ const ProductCard = ({ product }) => {
             {isLowStock && isInStock && <Badge label="Low Stock" variant="warning" />}
             {product.ratings >= 4.5 && isInStock && <Badge label="Top Rated" variant="new" />}
           </div>
+
+          <div className="absolute top-3 right-3">
+            <WishlistButton productId={product.id} variant="overlay" />
+          </div>
+          
         </div>
       </Link>
 
