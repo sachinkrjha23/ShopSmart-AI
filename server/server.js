@@ -1,5 +1,7 @@
 import app from "./app.js";
 import {v2 as cloudinary} from "cloudinary";
+import { autoCancelStaleOrders } from "./utils/autoCancelStaleOrders.js";
+
 
 cloudinary.config({
     cloud_name : process.env.CLOUDINARY_CLIENT_NAME,
@@ -20,3 +22,5 @@ server.on('error', (error) => {
         process.exit(1);
     }
 });
+
+setInterval(autoCancelStaleOrders, 5 * 60 * 1000);

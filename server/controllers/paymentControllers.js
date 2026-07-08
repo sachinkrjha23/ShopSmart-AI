@@ -3,6 +3,7 @@ import crypto from "crypto";
 import database from "../database/db.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
+import { applyPaymentSuccessEffects } from "../utils/applyPaymentSuccessEffects.js";
 
 const isValidUUID = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -322,18 +323,6 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
 
     await client.query("COMMIT");
 
-    //  Record Coupon Usage After Successful COMMIT
-    if (appliedCouponId) {
-      await database.query(
-        `UPDATE coupons SET used_count = used_count + 1 WHERE id = $1`,
-        [appliedCouponId],
-      );
-      await database.query(
-        `INSERT INTO coupon_usage (coupon_id, user_id, order_id) VALUES ($1, $2, $3)`,
-        [appliedCouponId, buyerId, order.id],
-      );
-    }
-
     //  Response
     res.status(201).json({
       success: true,
@@ -422,28 +411,17 @@ export const verifyPayment = catchAsyncErrors(async (req, res, next) => {
        WHERE razorpay_order_id = $3`,
       [razorpay_payment_id, razorpay_signature, razorpay_order_id],
     );
-
-    // Mark order as paid
-    await client.query(
+    
+    const { rows: paidRows } = await client.query(
       `UPDATE orders
        SET paid_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
+       WHERE id = $1 AND paid_at IS NULL
+       RETURNING id`,
       [orderId],
     );
 
-    // Decrease product stock
-    const { rows: items } = await client.query(
-      `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
-      [orderId],
-    );
-
-    for (const item of items) {
-      await client.query(
-        `UPDATE products
-         SET stock = stock - $1
-         WHERE id = $2 AND stock >= $1`,
-        [item.quantity, item.product_id],
-      );
+    if (paidRows.length > 0) {
+      await applyPaymentSuccessEffects(client, orderId, req.user.id);
     }
 
     await client.query("COMMIT");
@@ -521,15 +499,21 @@ export const handleWebhook = async (req, res) => {
 
         const orderId = paymentUpdate.rows[0].order_id;
 
-        await client.query(
+        const { rows: paidRows } = await client.query(
           `UPDATE orders o
            SET paid_at = CURRENT_TIMESTAMP
            FROM payments p
            WHERE p.order_id = o.id
              AND p.razorpay_order_id = $1
-             AND o.paid_at IS NULL`,
+             AND o.paid_at IS NULL
+           RETURNING o.id, o.buyer_id`,
           [razorpayOrderId],
         );
+
+        if (paidRows.length > 0) {
+          const { id: paidOrderId, buyer_id: buyerId } = paidRows[0];
+          await applyPaymentSuccessEffects(client, paidOrderId, buyerId);
+        }
 
         await client.query("COMMIT");
         transactionStarted = false;
@@ -730,16 +714,18 @@ export const cancelOrder = catchAsyncErrors(async (req, res, next) => {
       [orderId],
     );
 
-    const { rows: items } = await client.query(
-      `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
-      [orderId],
-    );
-
-    for (const item of items) {
-      await client.query(
-        `UPDATE products SET stock = stock + $1 WHERE id = $2`,
-        [item.quantity, item.product_id],
+    if (order.payment_status === "Paid") {
+      const { rows: items } = await client.query(
+        `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
+        [orderId],
       );
+
+      for (const item of items) {
+        await client.query(
+          `UPDATE products SET stock = stock + $1 WHERE id = $2`,
+          [item.quantity, item.product_id],
+        );
+      }
     }
 
     let refundInitiated = false;
@@ -973,16 +959,18 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
       [orderId],
     );
 
-    const { rows: items } = await client.query(
-      `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
-      [orderId],
-    );
-
-    for (const item of items) {
-      await client.query(
-        `UPDATE products SET stock = stock + $1 WHERE id = $2`,
-        [item.quantity, item.product_id],
+    if (order.payment_status === "Paid") {
+      const { rows: items } = await client.query(
+        `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
+        [orderId],
       );
+
+      for (const item of items) {
+        await client.query(
+          `UPDATE products SET stock = stock + $1 WHERE id = $2`,
+          [item.quantity, item.product_id],
+        );
+      }
     }
 
     let refundInitiated = false;
