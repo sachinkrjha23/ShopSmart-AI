@@ -411,7 +411,7 @@ export const verifyPayment = catchAsyncErrors(async (req, res, next) => {
        WHERE razorpay_order_id = $3`,
       [razorpay_payment_id, razorpay_signature, razorpay_order_id],
     );
-    
+
     const { rows: paidRows } = await client.query(
       `UPDATE orders
        SET paid_at = CURRENT_TIMESTAMP
@@ -599,19 +599,19 @@ export const getMyOrders = catchAsyncErrors(async (req, res, next) => {
 
   const { rows: orders } = await database.query(
     `SELECT
-       o.id, o.total_price, o.tax_price, o.shipping_price,
-       o.order_status, o.paid_at, o.created_at,
-       p.payment_status, p.razorpay_payment_id, p.payment_method,
-       s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
-       json_agg(
-         json_build_object(
-           'productId', oi.product_id,
-           'title',     oi.title,
-           'image',     oi.image,
-           'quantity',  oi.quantity,
-           'price',     oi.price
-         )
-       ) AS items
+      o.id, o.total_price, o.tax_price, o.shipping_price,
+      o.order_status, o.coupon_code, o.discount_amount, o.paid_at, o.created_at,      
+      p.payment_status, p.razorpay_payment_id, p.payment_method,
+      s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
+      json_agg(
+        json_build_object(
+          'productId', oi.product_id,
+          'title',     oi.title,
+          'image',     oi.image,
+          'quantity',  oi.quantity,
+          'price',     oi.price
+        )
+      ) AS items
      FROM orders o
      LEFT JOIN payments      p  ON p.order_id  = o.id
      LEFT JOIN shipping_info s  ON s.order_id  = o.id
@@ -640,19 +640,19 @@ export const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
 
   const { rows } = await database.query(
     `SELECT
-       o.id, o.total_price, o.tax_price, o.shipping_price,
-       o.order_status, o.paid_at, o.created_at,
-       p.payment_status, p.razorpay_payment_id, p.payment_method,
-       s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
-       json_agg(
-         json_build_object(
-           'productId', oi.product_id,
-           'title',     oi.title,
-           'image',     oi.image,
-           'quantity',  oi.quantity,
-           'price',     oi.price
-         )
-       ) AS items
+      o.id, o.total_price, o.tax_price, o.shipping_price,
+      o.order_status, o.coupon_code, o.discount_amount, o.paid_at, o.created_at,       
+      p.payment_status, p.razorpay_payment_id, p.payment_method,
+      s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
+      json_agg(
+        json_build_object(
+          'productId', oi.product_id,
+          'title',     oi.title,
+          'image',     oi.image,
+          'quantity',  oi.quantity,
+          'price',     oi.price
+        )
+      ) AS items
      FROM orders o
      LEFT JOIN payments      p  ON p.order_id  = o.id
      LEFT JOIN shipping_info s  ON s.order_id  = o.id
