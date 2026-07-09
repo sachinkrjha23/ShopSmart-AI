@@ -31,3 +31,9 @@ export const resetPassword = (token, data) =>
 export const googleLoginUser = (data) => axiosInstance.post('/api/v1/auth/google/login', data)
 
 export const googleSignupUser = (data) => axiosInstance.post('/api/v1/auth/google/signup', data)
+
+export const deleteAccount = (data) =>
+  axiosInstance.delete('/api/v1/auth/account/delete', { data })
+
+export const setAdminSecret = (data) =>
+  axiosInstance.put('/api/v1/admin/set-secret', data)

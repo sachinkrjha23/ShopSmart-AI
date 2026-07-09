@@ -1,23 +1,116 @@
-import { createSlice } from '@reduxjs/toolkit'
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import {
+  getDashboardStats,
+  getAllUsers,
+  deleteUser as deleteUserApi,
+} from "../../api/adminApi";
+
+export const fetchDashboardStats = createAsyncThunk(
+  "admin/fetchDashboardStats",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await getDashboardStats();
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch dashboard stats",
+      );
+    }
+  },
+);
+
+export const fetchAllUsers = createAsyncThunk(
+  "admin/fetchAllUsers",
+  async (page = 1, { rejectWithValue }) => {
+    try {
+      const res = await getAllUsers(page);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch users",
+      );
+    }
+  },
+);
+
+export const deleteUser = createAsyncThunk(
+  "admin/deleteUser",
+  async (id, { rejectWithValue }) => {
+    try {
+      await deleteUserApi(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to delete user",
+      );
+    }
+  },
+);
 
 const initialState = {
-  stats: {
-    todayRevenue: 0,
-    yesterdayRevenue: 0,
-    lastMonthRevenue: 0,
-    totalRevenue: 0,
-    totalSales: 0,
-  },
-  orders: [],
+  stats: null,
   users: [],
+  totalUsers: 0,
+  currentPage: 1,
   loading: false,
   error: null,
-}
+};
 
 const adminSlice = createSlice({
-  name: 'admin',
+  name: "admin",
   initialState,
-  reducers: {},
-})
+  reducers: {
+    clearAdminError: (state) => {
+      state.error = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchDashboardStats.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchDashboardStats.fulfilled, (state, action) => {
+        state.loading = false;
+        state.stats = action.payload;
+      })
+      .addCase(fetchDashboardStats.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
 
-export default adminSlice.reducer
+    builder
+      .addCase(fetchAllUsers.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAllUsers.fulfilled, (state, action) => {
+        state.loading = false;
+        state.users = action.payload.users;
+        state.totalUsers = action.payload.totalUsers;
+        state.currentPage = action.payload.currentPage;
+      })
+      .addCase(fetchAllUsers.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    builder
+      .addCase(deleteUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.users = state.users.filter((user) => user.id !== action.payload);
+        state.totalUsers -= 1;
+      })
+      .addCase(deleteUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+  },
+});
+
+export const { clearAdminError } = adminSlice.actions;
+export default adminSlice.reducer;

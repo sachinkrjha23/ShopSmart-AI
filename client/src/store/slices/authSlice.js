@@ -10,7 +10,8 @@ import {
   googleSignupUser,
   verifyEmailToken,
   resendVerificationEmail,
-  confirmEmailChange as confirmEmailChangeApi
+  confirmEmailChange as confirmEmailChangeApi,
+  deleteAccount as deleteAccountApi
 } from "../../api/authApi";
 
 export const register = createAsyncThunk(
@@ -158,6 +159,20 @@ export const changePassword = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || "Password update failed",
+      );
+    }
+  },
+);
+
+export const deleteAccount = createAsyncThunk(
+  "auth/deleteAccount",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await deleteAccountApi(data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to delete account",
       );
     }
   },
@@ -330,6 +345,20 @@ const authSlice = createSlice({
         state.loading = false;
       })
       .addCase(changePassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+    builder
+      .addCase(deleteAccount.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteAccount.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.isAuthenticated = false;
+      })
+      .addCase(deleteAccount.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

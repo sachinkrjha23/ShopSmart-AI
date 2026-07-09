@@ -13,6 +13,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { OAuth2Client } from "google-auth-library";
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 import jwt from "jsonwebtoken";
+import { anonymizeUser } from "../utils/anonymizeUser.js";
 
 const generateVerificationToken = () => {
   const verificationToken = crypto.randomBytes(20).toString("hex");
@@ -707,7 +708,12 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
       );
 
       const emailChangeToken = jwt.sign(
-        { purpose: "email-change", userId: req.user.id, newEmail: trimmedEmail, nonce },
+        {
+          purpose: "email-change",
+          userId: req.user.id,
+          newEmail: trimmedEmail,
+          nonce,
+        },
         process.env.JWT_SECRET_KEY,
         { expiresIn: "10m" },
       );
@@ -721,7 +727,10 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
           message: `<p>Please confirm this email address to complete your email change:</p><a href="${verifyUrl}">${verifyUrl}</a><p>This link expires in 10 minutes and can only be used once.</p>`,
         });
       } catch (error) {
-        console.error("Failed to send email-change verification email:", error.message);
+        console.error(
+          "Failed to send email-change verification email:",
+          error.message,
+        );
       }
 
       message = `Profile updated. Please check ${trimmedEmail} to confirm your email change.`;
@@ -797,9 +806,10 @@ export const confirmEmailChange = catchAsyncErrors(async (req, res, next) => {
   );
 
   if (emailTaken.rows.length > 0) {
-    await database.query(`UPDATE users SET email_change_nonce = NULL WHERE id = $1`, [
-      decoded.userId,
-    ]);
+    await database.query(
+      `UPDATE users SET email_change_nonce = NULL WHERE id = $1`,
+      [decoded.userId],
+    );
     return next(
       new ErrorHandler(
         "This email has since been registered by another account.",
@@ -823,4 +833,76 @@ export const confirmEmailChange = catchAsyncErrors(async (req, res, next) => {
     message: "Email updated successfully!",
     user: safeUser,
   });
+});
+
+export const deleteMyAccount = catchAsyncErrors(async (req, res, next) => {
+  const { password, adminSecret } = req.body;
+
+  if (req.user.role === "Admin") {
+    const adminCountResult = await database.query(
+      "SELECT COUNT(*) FROM users WHERE role = 'Admin' AND is_deleted = FALSE",
+    );
+    const adminCount = parseInt(adminCountResult.rows[0].count);
+
+    if (adminCount <= 1) {
+      return next(
+        new ErrorHandler(
+          "You are the only admin account. Promote another user to Admin before deleting this account.",
+          400,
+        ),
+      );
+    }
+
+    if (!req.user.admin_secret_hash) {
+      return next(
+        new ErrorHandler(
+          "Please set your admin security secret in Settings before deleting this account.",
+          400,
+        ),
+      );
+    }
+
+    if (!adminSecret) {
+      return next(
+        new ErrorHandler(
+          "Please enter your admin security secret to confirm.",
+          400,
+        ),
+      );
+    }
+
+    const isSecretMatch = await bcrypt.compare(
+      adminSecret,
+      req.user.admin_secret_hash,
+    );
+    if (!isSecretMatch) {
+      return next(new ErrorHandler("Incorrect admin security secret.", 401));
+    }
+  }
+
+  if (req.user.password) {
+    if (!password) {
+      return next(
+        new ErrorHandler(
+          "Please enter your password to confirm account deletion.",
+          400,
+        ),
+      );
+    }
+
+    const isMatch = await bcrypt.compare(password, req.user.password);
+    if (!isMatch) {
+      return next(new ErrorHandler("Incorrect password.", 401));
+    }
+  }
+
+  await anonymizeUser(req.user.id, req.user.avatar?.public_id);
+
+  res
+    .status(200)
+    .cookie("token", "", { expires: new Date(Date.now()), httpOnly: true })
+    .json({
+      success: true,
+      message: "Your account has been deleted successfully.",
+    });
 });

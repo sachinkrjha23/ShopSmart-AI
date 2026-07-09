@@ -16,7 +16,7 @@ const AdminNavbar = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100 h-16 flex items-center justify-between px-6">
-      <Link to="/" className="text-sm text-gray-500 hover:text-indigo-600 transition-colors">
+      <Link to="/" className="text-base font-semibold text-gray-700   hover:text-indigo-600 transition-colors">
         ← Back to Store
       </Link>
 
@@ -34,7 +34,7 @@ const AdminNavbar = () => {
         <button
           type="button"
           onClick={handleLogout}
-          className="text-sm text-gray-500 hover:text-red-500 transition-colors"
+          className="text-sm font-medium text-white bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition-colors"
         >
           Logout
         </button>

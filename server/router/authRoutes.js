@@ -1,6 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import {getUser,login,logout,register, forgotPassword, resetPassword, updatePassword, updateProfile, googleLogin, googleSignup, verifyEmail, resendVerification} from "../controllers/authControllers.js";
+import {getUser,login,logout,register, forgotPassword, resetPassword, updatePassword, updateProfile, googleLogin, googleSignup, verifyEmail, resendVerification, deleteMyAccount} from "../controllers/authControllers.js";
 import { isAuthenticated } from "../middlewares/authMiddleware.js";
 import { confirmEmailChange } from "../controllers/authControllers.js";
 
@@ -46,6 +46,7 @@ router.get("/email-change/confirm/:token", confirmEmailChange);
 
 router.get("/me", isAuthenticated, getUser);
 router.get("/logout", isAuthenticated, logout);
+router.delete("/account/delete", isAuthenticated, deleteMyAccount);
 router.put("/password/reset/:token", resetPassword);
 router.put("/password/update", isAuthenticated, updatePassword);
 router.put("/profile/update", isAuthenticated, updateProfile);

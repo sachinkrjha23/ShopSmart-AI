@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import ProfileForm from '../components/profile/ProfileForm'
+import DeleteAccountSection from '../components/profile/DeleteAccountSection'
 
 const QUICK_LINKS = [
   { to: '/orders', label: 'My Orders', description: 'Track, view, or cancel your orders' },
@@ -35,6 +36,7 @@ const Profile = () => {
           ))}
         </div>
       </div>
+      <DeleteAccountSection />
     </div>
   )
 }

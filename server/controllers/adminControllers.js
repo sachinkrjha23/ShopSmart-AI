@@ -2,12 +2,14 @@ import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
 import database from "../database/db.js";
 import { v2 as cloudinary } from "cloudinary";
+import { anonymizeUser } from "../utils/anonymizeUser.js";
+import bcrypt from "bcrypt";
 
 export const getAllUsers = catchAsyncErrors(async (req, res, next) => {
   const page = parseInt(req.query.page) || 1;
 
   const totalUsersResult = await database.query(
-    "SELECT COUNT(*) FROM users WHERE role = $1",
+    "SELECT COUNT(*) FROM users WHERE role = $1 AND is_deleted = FALSE",
     ["User"],
   );
 
@@ -16,19 +18,23 @@ export const getAllUsers = catchAsyncErrors(async (req, res, next) => {
   const offset = (page - 1) * 10;
 
   const users = await database.query(
-    "SELECT * FROM users WHERE role = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+    "SELECT * FROM users WHERE role = $1 AND is_deleted = FALSE ORDER BY created_at DESC LIMIT $2 OFFSET $3",
     ["User", 10, offset],
   );
+
+  const safeUsers = users.rows.map(({ password, ...safeUser }) => safeUser);
+
   res.status(200).json({
     success: true,
     totalUsers,
     currentPage: page,
-    users: users.rows,
+    users: safeUsers,
   });
 });
 
 export const deleteUser = catchAsyncErrors(async (req, res, next) => {
   const { id } = req.params;
+  const { adminSecret } = req.body;
 
   if (id === req.user.id) {
     return next(
@@ -39,24 +45,90 @@ export const deleteUser = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  const deleteUser = await database.query(
-    "DELETE FROM users WHERE id = $1 RETURNING *",
-    [id],
-  );
+  const userResult = await database.query("SELECT * FROM users WHERE id = $1", [id]);
 
-  if (deleteUser.rows.length === 0) {
+  if (userResult.rows.length === 0) {
     return next(new ErrorHandler("User not found", 404));
   }
 
-  const avatar = deleteUser.rows[0].avatar;
+  const targetUser = userResult.rows[0];
 
-  if (avatar?.public_id) {
-    await cloudinary.uploader.destroy(avatar.public_id);
+  if (targetUser.role === "Admin") {
+    const adminCountResult = await database.query(
+      "SELECT COUNT(*) FROM users WHERE role = 'Admin' AND is_deleted = FALSE",
+    );
+    const adminCount = parseInt(adminCountResult.rows[0].count);
+
+    if (adminCount <= 1) {
+      return next(
+        new ErrorHandler("Cannot delete the only remaining admin account.", 400),
+      );
+    }
+
+    if (!req.user.admin_secret_hash) {
+      return next(
+        new ErrorHandler(
+          "Please set your admin security secret in Settings before performing this action.",
+          400,
+        ),
+      );
+    }
+
+    if (!adminSecret) {
+      return next(
+        new ErrorHandler(
+          "Please enter your admin security secret to confirm.",
+          400,
+        ),
+      );
+    }
+
+    const isSecretMatch = await bcrypt.compare(
+      adminSecret,
+      req.user.admin_secret_hash,
+    );
+    if (!isSecretMatch) {
+      return next(new ErrorHandler("Incorrect admin security secret.", 401));
+    }
   }
+
+  await anonymizeUser(id, targetUser.avatar?.public_id);
 
   res.status(200).json({
     success: true,
     message: "User deleted successfully",
+  });
+});
+
+export const setAdminSecret = catchAsyncErrors(async (req, res, next) => {
+  const { secret, confirmSecret } = req.body;
+
+  if (!secret || !confirmSecret) {
+    return next(
+      new ErrorHandler("Please provide and confirm your admin secret.", 400),
+    );
+  }
+
+  if (secret !== confirmSecret) {
+    return next(new ErrorHandler("Secrets do not match.", 400));
+  }
+
+  if (secret.length < 8) {
+    return next(
+      new ErrorHandler("Admin secret must be at least 8 characters.", 400),
+    );
+  }
+
+  const hashedSecret = await bcrypt.hash(secret, 10);
+
+  await database.query(
+    `UPDATE users SET admin_secret_hash = $1 WHERE id = $2`,
+    [hashedSecret, req.user.id],
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Admin secret set successfully.",
   });
 });
 

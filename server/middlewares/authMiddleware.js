@@ -21,6 +21,13 @@ export const isAuthenticated = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("User not found. Please login again.", 404));
   }
 
+  if (user.rows[0].is_deleted) {
+    res.cookie("token", "", { expires: new Date(Date.now()), httpOnly: true });
+    return next(
+      new ErrorHandler("This account no longer exists. Please login again.", 401),
+    );
+  }
+
   req.user = user.rows[0];
   next();
 });
