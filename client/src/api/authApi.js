@@ -14,7 +14,11 @@ export const logoutUser = () => axiosInstance.get('/api/v1/auth/logout')
 
 export const getMe = () => axiosInstance.get('/api/v1/auth/me')
 
-export const updateProfile = (data) => axiosInstance.put('/api/v1/auth/profile/update', data)
+export const updateProfile = (data) =>
+  axiosInstance.put(`/api/v1/auth/profile/update?frontendUrl=${window.location.origin}`, data)
+
+export const confirmEmailChange = (token) =>
+  axiosInstance.get(`/api/v1/auth/email-change/confirm/${token}`)
 
 export const updatePassword = (data) => axiosInstance.put('/api/v1/auth/password/update', data)
 

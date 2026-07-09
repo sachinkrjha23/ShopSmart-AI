@@ -45,6 +45,9 @@ export async function createUserTable() {
     await database.query(
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expire TIMESTAMP DEFAULT NULL;`,
     );
+    await database.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_change_nonce TEXT DEFAULT NULL;`,
+    );
 
     await database.query(`
       UPDATE users SET is_email_verified = TRUE 

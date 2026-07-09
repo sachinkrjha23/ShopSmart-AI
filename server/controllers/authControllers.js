@@ -12,6 +12,7 @@ import { validatePassword } from "../utils/passwordValidation.js";
 import { v2 as cloudinary } from "cloudinary";
 import { OAuth2Client } from "google-auth-library";
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+import jwt from "jsonwebtoken";
 
 const generateVerificationToken = () => {
   const verificationToken = crypto.randomBytes(20).toString("hex");
@@ -470,6 +471,15 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Please provide all required fields.", 400));
   }
 
+  if (!req.user.password) {
+    return next(
+      new ErrorHandler(
+        "This account uses Google Sign-In and has no password to update.",
+        400,
+      ),
+    );
+  }
+
   const isPasswordMatch = await bcrypt.compare(
     currentPassword,
     req.user.password,
@@ -514,6 +524,7 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
 
 export const updateProfile = catchAsyncErrors(async (req, res, next) => {
   const { name, email, removeAvatar } = req.body;
+  const { frontendUrl } = req.query;
 
   if (!req.user?.id) {
     return next(new ErrorHandler("User not authenticated.", 401));
@@ -540,15 +551,23 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Please provide a valid email address.", 400));
   }
 
-  const emailExists = await database.query(
-    "SELECT id FROM users WHERE email = $1 AND id != $2",
-    [trimmedEmail, req.user.id],
-  );
+  const emailChanged = trimmedEmail !== req.user.email;
 
-  if (emailExists.rows.length > 0) {
-    return next(
-      new ErrorHandler("Email is already registered by another user.", 400),
+  if (emailChanged && !frontendUrl) {
+    return next(new ErrorHandler("Frontend URL is required.", 400));
+  }
+
+  if (emailChanged) {
+    const emailTakenByUser = await database.query(
+      "SELECT id FROM users WHERE email = $1 AND id != $2",
+      [trimmedEmail, req.user.id],
     );
+
+    if (emailTakenByUser.rows.length > 0) {
+      return next(
+        new ErrorHandler("Email is already registered by another user.", 400),
+      );
+    }
   }
 
   const shouldRemoveAvatar = removeAvatar === "true" || removeAvatar === true;
@@ -622,32 +641,32 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
       case "REMOVE":
         query = `
           UPDATE users 
-          SET name = $1, email = $2, avatar = NULL 
-          WHERE id = $3 
+          SET name = $1, avatar = NULL 
+          WHERE id = $2 
           RETURNING *
         `;
-        params = [trimmedName, trimmedEmail, req.user.id];
+        params = [trimmedName, req.user.id];
         break;
 
       case "UPDATE":
         query = `
           UPDATE users 
-          SET name = $1, email = $2, avatar = $3 
-          WHERE id = $4 
+          SET name = $1, avatar = $2 
+          WHERE id = $3 
           RETURNING *
         `;
-        params = [trimmedName, trimmedEmail, newAvatarData, req.user.id];
+        params = [trimmedName, newAvatarData, req.user.id];
         break;
 
       case "KEEP":
       default:
         query = `
           UPDATE users 
-          SET name = $1, email = $2 
-          WHERE id = $3 
+          SET name = $1 
+          WHERE id = $2 
           RETURNING *
         `;
-        params = [trimmedName, trimmedEmail, req.user.id];
+        params = [trimmedName, req.user.id];
         break;
     }
 
@@ -677,10 +696,43 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
       }
     }
 
+    let message = "Profile updated successfully.";
+
+    if (emailChanged) {
+      const nonce = crypto.randomBytes(16).toString("hex");
+
+      await database.query(
+        `UPDATE users SET email_change_nonce = $1 WHERE id = $2`,
+        [nonce, req.user.id],
+      );
+
+      const emailChangeToken = jwt.sign(
+        { purpose: "email-change", userId: req.user.id, newEmail: trimmedEmail, nonce },
+        process.env.JWT_SECRET_KEY,
+        { expiresIn: "10m" },
+      );
+
+      const verifyUrl = `${frontendUrl}/verify-email-change/${emailChangeToken}`;
+
+      try {
+        await sendEmail({
+          email: trimmedEmail,
+          subject: "ShopSmart-AI - Confirm Your New Email",
+          message: `<p>Please confirm this email address to complete your email change:</p><a href="${verifyUrl}">${verifyUrl}</a><p>This link expires in 10 minutes and can only be used once.</p>`,
+        });
+      } catch (error) {
+        console.error("Failed to send email-change verification email:", error.message);
+      }
+
+      message = `Profile updated. Please check ${trimmedEmail} to confirm your email change.`;
+    }
+
+    const { password, ...safeUser } = user;
+
     res.status(200).json({
       success: true,
-      message: "Profile updated successfully.",
-      user: user,
+      message,
+      user: safeUser,
     });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -700,4 +752,75 @@ export const updateProfile = catchAsyncErrors(async (req, res, next) => {
   } finally {
     client.release();
   }
+});
+
+export const confirmEmailChange = catchAsyncErrors(async (req, res, next) => {
+  const { token } = req.params;
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+  } catch (error) {
+    return next(new ErrorHandler("Invalid or expired email change link.", 400));
+  }
+
+  if (
+    decoded.purpose !== "email-change" ||
+    !decoded.userId ||
+    !decoded.newEmail ||
+    !decoded.nonce
+  ) {
+    return next(new ErrorHandler("Invalid email change link.", 400));
+  }
+
+  const userResult = await database.query(
+    `SELECT email_change_nonce FROM users WHERE id = $1`,
+    [decoded.userId],
+  );
+
+  if (userResult.rows.length === 0) {
+    return next(new ErrorHandler("User not found.", 404));
+  }
+
+  if (userResult.rows[0].email_change_nonce !== decoded.nonce) {
+    return next(
+      new ErrorHandler(
+        "This link has already been used or a newer request was made.",
+        400,
+      ),
+    );
+  }
+
+  const emailTaken = await database.query(
+    `SELECT id FROM users WHERE email = $1 AND id != $2`,
+    [decoded.newEmail, decoded.userId],
+  );
+
+  if (emailTaken.rows.length > 0) {
+    await database.query(`UPDATE users SET email_change_nonce = NULL WHERE id = $1`, [
+      decoded.userId,
+    ]);
+    return next(
+      new ErrorHandler(
+        "This email has since been registered by another account.",
+        400,
+      ),
+    );
+  }
+
+  const updatedUser = await database.query(
+    `UPDATE users 
+     SET email = $1, is_email_verified = TRUE, email_change_nonce = NULL 
+     WHERE id = $2 
+     RETURNING *`,
+    [decoded.newEmail, decoded.userId],
+  );
+
+  const { password, ...safeUser } = updatedUser.rows[0];
+
+  res.status(200).json({
+    success: true,
+    message: "Email updated successfully!",
+    user: safeUser,
+  });
 });

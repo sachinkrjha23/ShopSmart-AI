@@ -10,6 +10,7 @@ import {
   googleSignupUser,
   verifyEmailToken,
   resendVerificationEmail,
+  confirmEmailChange as confirmEmailChangeApi
 } from "../../api/authApi";
 
 export const register = createAsyncThunk(
@@ -129,6 +130,20 @@ export const editProfile = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || "Profile update failed",
+      );
+    }
+  },
+);
+
+export const confirmEmailChange = createAsyncThunk(
+  "auth/confirmEmailChange",
+  async (token, { rejectWithValue }) => {
+    try {
+      const res = await confirmEmailChangeApi(token);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to confirm email change",
       );
     }
   },
@@ -291,7 +306,21 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       });
-
+    
+    builder
+      .addCase(confirmEmailChange.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(confirmEmailChange.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+      })
+      .addCase(confirmEmailChange.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+      
     builder
       .addCase(changePassword.pending, (state) => {
         state.loading = true;

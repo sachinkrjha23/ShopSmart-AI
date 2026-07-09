@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation  } from "react-router-dom";
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { fetchMe } from "./store/slices/authSlice";
@@ -31,6 +31,7 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import ReturnPolicy from "./pages/ReturnPolicy";
 import NotFound from "./pages/NotFound";
 import VerifyEmail from "./pages/VerifyEmail";
+import VerifyEmailChange from "./pages/VerifyEmailChange";
 
 // Pages - Admin
 import Dashboard from "./pages/admin/Dashboard";
@@ -54,6 +55,8 @@ import { useSelector } from "react-redux";
 
 const App = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
   const { isAuthenticated, sessionChecked } = useSelector(
     (state) => state.auth,
   );
@@ -71,10 +74,14 @@ const App = () => {
   return (
     <>
       <Toaster position="top-right" />
-      <Navbar />
-      <LoginModal />
-      <RegisterModal />
-      <CartDrawer />
+      {!isAdminRoute && (
+        <>
+          <Navbar />
+          <LoginModal />
+          <RegisterModal />
+          <CartDrawer />
+        </>
+      )}
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Home />} />
@@ -100,6 +107,8 @@ const App = () => {
         <Route path="/return-policy" element={<ReturnPolicy />} />
 
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
+
+        <Route path="/verify-email-change/:token" element={<VerifyEmailChange />} />
 
         {/* ****************************************************************** */}
 

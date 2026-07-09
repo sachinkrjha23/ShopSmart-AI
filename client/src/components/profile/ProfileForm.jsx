@@ -79,8 +79,8 @@ const ProfileForm = ({ user }) => {
     }
 
     try {
-      await dispatch(editProfile(data)).unwrap()
-      toast.success('Profile updated successfully!')
+      const result = await dispatch(editProfile(data)).unwrap()
+      toast.success(result.message || 'Profile updated successfully!')
       setAvatarFile(null)
       setRemoveAvatar(false)
     } catch (err) {
