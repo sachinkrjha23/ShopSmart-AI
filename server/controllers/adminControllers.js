@@ -45,7 +45,9 @@ export const deleteUser = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  const userResult = await database.query("SELECT * FROM users WHERE id = $1", [id]);
+  const userResult = await database.query("SELECT * FROM users WHERE id = $1", [
+    id,
+  ]);
 
   if (userResult.rows.length === 0) {
     return next(new ErrorHandler("User not found", 404));
@@ -61,7 +63,10 @@ export const deleteUser = catchAsyncErrors(async (req, res, next) => {
 
     if (adminCount <= 1) {
       return next(
-        new ErrorHandler("Cannot delete the only remaining admin account.", 400),
+        new ErrorHandler(
+          "Cannot delete the only remaining admin account.",
+          400,
+        ),
       );
     }
 
@@ -168,6 +173,7 @@ export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
     lastMonthRevenueResult,
     newUsersResult,
     topSellingResult,
+    totalOrdersResult,
   ] = await Promise.all([
     // Total Revenue
     database.query(
@@ -240,6 +246,9 @@ export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
       ORDER BY total_sold DESC
       LIMIT 5
     `),
+
+    // Total Orders Placed (counting only successfully paid orders)
+    database.query(`SELECT COUNT(*) FROM orders WHERE paid_at IS NOT NULL`),
   ]);
 
   // Process results (no need for || 0 fallbacks anymore!)
@@ -271,13 +280,26 @@ export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
 
   const topSellingProducts = topSellingResult.rows;
   const lowStockProducts = lowStockResult.rows;
+  const totalOrdersPlaced = parseInt(totalOrdersResult.rows[0].count);
 
   // Calculate Revenue Growth
-  let revenueGrowth = "0%";
+  let revenueGrowth = null;
   if (lastMonthRevenue > 0) {
     const growthRate =
       ((currentMonthSales - lastMonthRevenue) / lastMonthRevenue) * 100;
     revenueGrowth = `${growthRate >= 0 ? "+" : ""}${growthRate.toFixed(2)}%`;
+  } else if (currentMonthSales > 0) {
+    revenueGrowth = "New";
+  }
+
+  // Calculate Today vs Yesterday Growth
+  let todayGrowth = null;
+  if (yesterdayRevenue > 0) {
+    const todayGrowthRate =
+      ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+    todayGrowth = `${todayGrowthRate >= 0 ? "+" : ""}${todayGrowthRate.toFixed(2)}%`;
+  } else if (todayRevenue > 0) {
+    todayGrowth = "New";
   }
 
   res.status(200).json({
@@ -290,9 +312,12 @@ export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
     orderStatusCounts,
     monthlySales,
     currentMonthSales,
+    lastMonthRevenue,
     topSellingProducts,
     lowStockProducts,
     revenueGrowth,
+    todayGrowth,
     newUsersThisMonth,
+    totalOrdersPlaced,
   });
 });
