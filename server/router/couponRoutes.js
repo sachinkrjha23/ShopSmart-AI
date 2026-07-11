@@ -7,7 +7,7 @@ const router = express.Router();
 
 const validateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 20,
+    max: 200,
     message: { success: false, message: "Too many coupon attempts. Try again later." }
 });
 

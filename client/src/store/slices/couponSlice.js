@@ -1,5 +1,12 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { applyCouponCode } from "../../api/couponApi";
+import {
+  applyCouponCode,
+  getAdminCoupons,
+  createAdminCoupon as createAdminCouponApi,
+  updateAdminCoupon as updateAdminCouponApi,
+  toggleAdminCoupon as toggleAdminCouponApi,
+  deleteAdminCoupon as deleteAdminCouponApi,
+} from "../../api/couponApi";
 import { login, fetchMe, googleLogin, googleSignup, logout } from "./authSlice";
 
 export const applyCoupon = createAsyncThunk(
@@ -16,6 +23,76 @@ export const applyCoupon = createAsyncThunk(
   },
 );
 
+export const fetchAdminCoupons = createAsyncThunk(
+  "coupon/fetchAdminCoupons",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await getAdminCoupons();
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch coupons",
+      );
+    }
+  },
+);
+
+export const createAdminCoupon = createAsyncThunk(
+  "coupon/createAdminCoupon",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await createAdminCouponApi(data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to create coupon",
+      );
+    }
+  },
+);
+
+export const updateAdminCoupon = createAsyncThunk(
+  "coupon/updateAdminCoupon",
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await updateAdminCouponApi(id, data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to update coupon",
+      );
+    }
+  },
+);
+
+export const toggleAdminCoupon = createAsyncThunk(
+  "coupon/toggleAdminCoupon",
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await toggleAdminCouponApi(id);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to toggle coupon",
+      );
+    }
+  },
+);
+
+export const deleteAdminCoupon = createAsyncThunk(
+  "coupon/deleteAdminCoupon",
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await deleteAdminCouponApi(id);
+      return { id, ...res.data };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to delete coupon",
+      );
+    }
+  },
+);
+
 const COUPON_KEY_PREFIX = "shopsmart_coupon_";
 export const getCouponKey = (userId) => `${COUPON_KEY_PREFIX}${userId}`;
 
@@ -25,6 +102,7 @@ const initialState = {
   finalAmount: null,
   appliedForTotal: null,
   pendingCode: null,
+  adminCoupons: [],
   loading: false,
   error: null,
 };
@@ -91,6 +169,60 @@ const couponSlice = createSlice({
         state.finalAmount = null;
         state.appliedForTotal = null;
         state.pendingCode = null;
+      });
+
+    builder
+      .addCase(fetchAdminCoupons.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAdminCoupons.fulfilled, (state, action) => {
+        state.loading = false;
+        state.adminCoupons = action.payload.coupons || [];
+      })
+      .addCase(fetchAdminCoupons.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(createAdminCoupon.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createAdminCoupon.fulfilled, (state, action) => {
+        state.loading = false;
+        state.adminCoupons.unshift(action.payload.coupon);
+      })
+      .addCase(createAdminCoupon.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(updateAdminCoupon.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateAdminCoupon.fulfilled, (state, action) => {
+        state.loading = false;
+        const updated = action.payload.coupon;
+        const index = state.adminCoupons.findIndex((c) => c.id === updated.id);
+        if (index !== -1) state.adminCoupons[index] = updated;
+      })
+      .addCase(updateAdminCoupon.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(toggleAdminCoupon.fulfilled, (state, action) => {
+        const updated = action.payload.coupon;
+        const index = state.adminCoupons.findIndex((c) => c.id === updated.id);
+        if (index !== -1) state.adminCoupons[index] = updated;
+      })
+      .addCase(toggleAdminCoupon.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+      .addCase(deleteAdminCoupon.fulfilled, (state, action) => {
+        state.adminCoupons = state.adminCoupons.filter((c) => c.id !== action.payload.id);
+      })
+      .addCase(deleteAdminCoupon.rejected, (state, action) => {
+        state.error = action.payload;
       });
   },
 });

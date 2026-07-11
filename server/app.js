@@ -12,6 +12,9 @@ import paymentRouter from "./router/paymentRoutes.js";
 import wishlistRouter from "./router/wishlistRoutes.js";
 import addressRouter from "./router/addressRoutes.js";
 import couponRouter from "./router/couponRoutes.js";
+import settingsRouter from "./router/settingsRoutes.js";
+import contactRouter from "./router/contactRoutes.js";
+
 
 
 const app = express();
@@ -44,6 +47,9 @@ app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/wishlist", wishlistRouter);
 app.use("/api/v1/address", addressRouter);
 app.use("/api/v1/coupon", couponRouter);
+app.use("/api/v1/settings", settingsRouter);
+app.use("/api/v1/contact", contactRouter);
+
 
 await createTables();
 

@@ -1,12 +1,15 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { isAuthenticated, authorizedRoles } from "../middlewares/authMiddleware.js";
-import { createOrder, verifyPayment, handleWebhook, getMyOrders, getSingleOrder, adminGetAllOrders, adminUpdateOrderStatus, adminInitiateRefund, cancelOrder, adminCancelOrder, } 
-from "../controllers/paymentControllers.js";
+import {
+  createOrder, verifyPayment, handleWebhook, getMyOrders, getSingleOrder,
+  adminGetAllOrders, adminGetSingleOrder, adminUpdateOrderStatus,
+  adminInitiateRefund, cancelOrder, adminCancelOrder,
+} from "../controllers/paymentControllers.js";
 
 
 const paymentLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 10,
   message: { success: false, message: "Too many payment attempts. Please try again after 15 minutes." }
 });
@@ -33,6 +36,7 @@ router.delete("/cancel/:orderId",        isAuthenticated, cancelOrder);
 
 // ADMIN ROUTES 
 router.get("/admin/all-orders", isAuthenticated, authorizedRoles("Admin"), adminGetAllOrders);
+router.get("/admin/order/:orderId", isAuthenticated, authorizedRoles("Admin"), adminGetSingleOrder);
 router.put("/admin/order/:orderId", isAuthenticated, authorizedRoles("Admin"), adminUpdateOrderStatus);
 router.post("/admin/refund", isAuthenticated, authorizedRoles("Admin"), adminInitiateRefund);
 router.delete("/admin/cancel/:orderId",  isAuthenticated, authorizedRoles("Admin"), adminCancelOrder);

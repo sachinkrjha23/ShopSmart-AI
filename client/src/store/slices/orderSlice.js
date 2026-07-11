@@ -4,6 +4,10 @@ import {
   getSingleOrder,
   getMyOrders,
   cancelOrder as cancelOrderApi,
+  getAdminAllOrders,
+  getAdminSingleOrder,
+  updateOrderStatus as updateOrderStatusApi,
+  adminCancelOrder as adminCancelOrderApi,
 } from "../../api/orderApi";
 
 export const createOrder = createAsyncThunk(
@@ -62,9 +66,76 @@ export const cancelOrder = createAsyncThunk(
   },
 );
 
+export const cancelAdminOrder = createAsyncThunk(
+  "order/cancelAdminOrder",
+  async (orderId, { rejectWithValue }) => {
+    try {
+      const res = await adminCancelOrderApi(orderId);
+      return { ...res.data, orderId };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to cancel order",
+      );
+    }
+  },
+);
+
+export const fetchAdminOrders = createAsyncThunk(
+  "order/fetchAdminOrders",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const res = await getAdminAllOrders(params);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch orders",
+      );
+    }
+  },
+);
+
+export const fetchAdminSingleOrder = createAsyncThunk(
+  "order/fetchAdminSingleOrder",
+  async (orderId, { rejectWithValue }) => {
+    try {
+      const res = await getAdminSingleOrder(orderId);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch order",
+      );
+    }
+  },
+);
+
+export const updateOrderStatus = createAsyncThunk(
+  "order/updateOrderStatus",
+  async ({ orderId, status }, { rejectWithValue }) => {
+    try {
+      const res = await updateOrderStatusApi(orderId, status);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to update order status",
+      );
+    }
+  },
+);
+
 const initialState = {
   orders: [],
   singleOrder: null,
+  adminOrders: [],
+  adminPagination: {
+    currentPage: 1,
+    totalPages: 1,
+    totalOrders: 0,
+  },
+  adminFilters: {
+    status: "",
+    search: "",
+  },
+  adminSingleOrder: null,
   loading: false,
   error: null,
 };
@@ -78,6 +149,13 @@ const orderSlice = createSlice({
     },
     clearSingleOrder: (state) => {
       state.singleOrder = null;
+    },
+    clearAdminSingleOrder: (state) => {
+      state.adminSingleOrder = null;
+    },
+    setAdminOrderFilters: (state, action) => {
+      state.adminFilters = { ...state.adminFilters, ...action.payload };
+      state.adminPagination.currentPage = 1;
     },
   },
   extraReducers: (builder) => {
@@ -146,8 +224,101 @@ const orderSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       });
+
+    builder
+      .addCase(fetchAdminOrders.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAdminOrders.fulfilled, (state, action) => {
+        state.loading = false;
+        state.adminOrders = action.payload.orders || [];
+        state.adminPagination.totalOrders = action.payload.totalOrders || 0;
+        state.adminPagination.totalPages = Math.ceil(
+          (action.payload.totalOrders || 0) / 10,
+        );
+        state.adminPagination.currentPage = action.payload.currentPage || 1;
+      })
+      .addCase(fetchAdminOrders.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    builder
+      .addCase(fetchAdminSingleOrder.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.adminSingleOrder = null;
+      })
+      .addCase(fetchAdminSingleOrder.fulfilled, (state, action) => {
+        state.loading = false;
+        state.adminSingleOrder = action.payload.order;
+      })
+      .addCase(fetchAdminSingleOrder.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    builder
+      .addCase(updateOrderStatus.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateOrderStatus.fulfilled, (state, action) => {
+        state.loading = false;
+        const updated = action.payload.order;
+        const index = state.adminOrders.findIndex((o) => o.id === updated.id);
+        if (index !== -1) {
+          state.adminOrders[index] = {
+            ...state.adminOrders[index],
+            order_status: updated.order_status,
+          };
+        }
+        if (state.adminSingleOrder?.id === updated.id) {
+          state.adminSingleOrder = {
+            ...state.adminSingleOrder,
+            order_status: updated.order_status,
+          };
+        }
+      })
+      .addCase(updateOrderStatus.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    builder
+      .addCase(cancelAdminOrder.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(cancelAdminOrder.fulfilled, (state, action) => {
+        state.loading = false;
+        const { orderId } = action.payload;
+        const index = state.adminOrders.findIndex((o) => o.id === orderId);
+        if (index !== -1) {
+          state.adminOrders[index] = {
+            ...state.adminOrders[index],
+            order_status: "Cancelled",
+          };
+        }
+        if (state.adminSingleOrder?.id === orderId) {
+          state.adminSingleOrder = {
+            ...state.adminSingleOrder,
+            order_status: "Cancelled",
+          };
+        }
+      })
+      .addCase(cancelAdminOrder.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   },
 });
 
-export const { clearOrderError, clearSingleOrder } = orderSlice.actions;
+export const {
+  clearOrderError,
+  clearSingleOrder,
+  clearAdminSingleOrder,
+  setAdminOrderFilters,
+} = orderSlice.actions;
 export default orderSlice.reducer;

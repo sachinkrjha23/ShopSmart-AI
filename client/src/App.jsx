@@ -49,9 +49,12 @@ import Navbar from "./components/layout/Navbar";
 import LoginModal from "./components/auth/LoginModal";
 import RegisterModal from "./components/auth/RegisterModal";
 import CartDrawer from "./components/layout/CartDrawer";
+import Footer from "./components/layout/Footer";
 import { Toaster } from "react-hot-toast";
 import { fetchWishlist } from "./store/slices/wishlistSlice";
 import { useSelector } from "react-redux";
+import Messages from "./pages/admin/Messages";
+import ScrollToTop from "./components/layout/ScrollToTop";
 
 const App = () => {
   const dispatch = useDispatch();
@@ -74,6 +77,7 @@ const App = () => {
   return (
     <>
       <Toaster position="top-right" />
+      <ScrollToTop />
       {!isAdminRoute && (
         <>
           <Navbar />
@@ -300,6 +304,15 @@ const App = () => {
         />
 
         <Route
+          path="/admin/messages"
+          element={
+            <AdminRoute>
+              <Messages />
+            </AdminRoute>
+          }
+        />
+
+        <Route
           path="/admin/settings"
           element={
             <AdminRoute>
@@ -311,6 +324,7 @@ const App = () => {
         {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      {!isAdminRoute && <Footer />}
     </>
   );
 };

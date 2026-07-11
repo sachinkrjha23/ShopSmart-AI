@@ -138,29 +138,12 @@ export const setAdminSecret = catchAsyncErrors(async (req, res, next) => {
 });
 
 export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
-  const today = new Date();
-  const todayDate = today.toISOString().split("T")[0];
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const yesterdayDate = yesterday.toISOString().split("T")[0];
 
-  const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
-  const currentMonthEnd = new Date(
-    today.getFullYear(),
-    today.getMonth() + 1,
-    0,
+  const settingsResult = await database.query(
+    `SELECT low_stock_threshold FROM store_settings WHERE id = 1`,
   );
+  const lowStockThreshold = settingsResult.rows[0]?.low_stock_threshold ?? 5;
 
-  const previousMonthStart = new Date(
-    today.getFullYear(),
-    today.getMonth() - 1,
-    1,
-  );
-
-  const previousMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-
-  // ✅ Run ALL independent queries in parallel with COALESCE
   const [
     totalRevenueResult,
     totalUsersResult,
@@ -169,69 +152,72 @@ export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
     yesterdayRevenueResult,
     monthlySalesResult,
     currentMonthSalesResult,
-    lowStockResult,
     lastMonthRevenueResult,
+    lowStockResult,
     newUsersResult,
     topSellingResult,
     totalOrdersResult,
   ] = await Promise.all([
-    // Total Revenue
+    // Total Revenue — excludes Cancelled
     database.query(
-      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders WHERE paid_at IS NOT NULL`,
+      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders WHERE paid_at IS NOT NULL AND order_status != 'Cancelled'`,
     ),
 
     // Total Users
     database.query(`SELECT COUNT(*) FROM users WHERE role = 'User'`),
 
-    // Order Status Counts
+    // Order Status Counts — Cancelled intentionally included here, this is the one place it belongs
     database.query(
       `SELECT order_status, COUNT(*) FROM orders WHERE paid_at IS NOT NULL GROUP BY order_status`,
     ),
 
-    // Today's Revenue
+    // Today's Revenue — excludes Cancelled
     database.query(
-      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders WHERE created_at::date = $1 AND paid_at IS NOT NULL`,
-      [todayDate],
+      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders WHERE created_at::date = CURRENT_DATE AND paid_at IS NOT NULL AND order_status != 'Cancelled'`,
     ),
 
-    // Yesterday's Revenue
+    // Yesterday's Revenue — excludes Cancelled
     database.query(
-      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders WHERE created_at::date = $1 AND paid_at IS NOT NULL`,
-      [yesterdayDate],
+      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders WHERE created_at::date = CURRENT_DATE - INTERVAL '1 day' AND paid_at IS NOT NULL AND order_status != 'Cancelled'`,
     ),
 
-    // Monthly Sales
+    // Monthly Sales (chart) — excludes Cancelled
     database.query(`
       SELECT TO_CHAR(created_at, 'Mon YYYY') AS month,
       DATE_TRUNC('month', created_at) as date,
       COALESCE(SUM(total_price), 0) as totalsales
-      FROM orders WHERE paid_at IS NOT NULL
+      FROM orders WHERE paid_at IS NOT NULL AND order_status != 'Cancelled'
       GROUP BY month, date
       ORDER BY date ASC
     `),
 
-    // Current Month Sales
+    // Current Month Sales — excludes Cancelled
     database.query(
-      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders WHERE paid_at IS NOT NULL AND created_at BETWEEN $1 AND $2`,
-      [currentMonthStart, currentMonthEnd],
+      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders
+       WHERE paid_at IS NOT NULL
+       AND order_status != 'Cancelled'
+       AND created_at >= DATE_TRUNC('month', CURRENT_DATE)
+       AND created_at < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'`,
+    ),
+
+    // Last Month Revenue — excludes Cancelled
+    database.query(
+      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders
+       WHERE paid_at IS NOT NULL
+       AND order_status != 'Cancelled'
+       AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+       AND created_at < DATE_TRUNC('month', CURRENT_DATE)`,
     ),
 
     // Low Stock Products
-    database.query(`SELECT name, stock FROM products WHERE stock <= 5`),
-
-    // Last Month Revenue
-    database.query(
-      `SELECT COALESCE(SUM(total_price), 0) AS total FROM orders WHERE paid_at IS NOT NULL AND created_at BETWEEN $1 AND $2`,
-      [previousMonthStart, previousMonthEnd],
-    ),
-
+    database.query(`SELECT name, stock FROM products WHERE stock <= $1`, [lowStockThreshold]),
+    
     // New Users This Month
     database.query(
-      `SELECT COUNT(*) FROM users WHERE created_at >= $1 AND role = 'User'`,
-      [currentMonthStart],
+      `SELECT COUNT(*) FROM users WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE) AND role = 'User'`,
     ),
 
-    // Top 5 Selling Products
+    // Top 5 Selling Products — excludes Cancelled
     database.query(`
       SELECT p.name,
              p.images->0->>'url' AS image,
@@ -241,21 +227,21 @@ export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
       FROM order_items oi
       JOIN products p ON p.id = oi.product_id
       JOIN orders o ON o.id = oi.order_id
-      WHERE o.paid_at IS NOT NULL
+      WHERE o.paid_at IS NOT NULL AND o.order_status != 'Cancelled'
       GROUP BY p.name, p.images, p.category, p.ratings
       ORDER BY total_sold DESC
       LIMIT 5
     `),
 
-    // Total Orders Placed (counting only successfully paid orders)
-    database.query(`SELECT COUNT(*) FROM orders WHERE paid_at IS NOT NULL`),
+    // Total Orders Placed — excludes Cancelled (not counted as a completed sale)
+    database.query(
+      `SELECT COUNT(*) FROM orders WHERE paid_at IS NOT NULL AND order_status != 'Cancelled'`,
+    ),
   ]);
 
-  // Process results (no need for || 0 fallbacks anymore!)
   const totalRevenueAllTime = parseFloat(totalRevenueResult.rows[0].total);
   const totalUsersCount = parseInt(totalUsersResult.rows[0].count);
 
-  // Order Status Counts
   const orderStatusCounts = {
     Processing: 0,
     Shipped: 0,
@@ -282,7 +268,6 @@ export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
   const lowStockProducts = lowStockResult.rows;
   const totalOrdersPlaced = parseInt(totalOrdersResult.rows[0].count);
 
-  // Calculate Revenue Growth
   let revenueGrowth = null;
   if (lastMonthRevenue > 0) {
     const growthRate =
@@ -292,7 +277,6 @@ export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
     revenueGrowth = "New";
   }
 
-  // Calculate Today vs Yesterday Growth
   let todayGrowth = null;
   if (yesterdayRevenue > 0) {
     const todayGrowthRate =

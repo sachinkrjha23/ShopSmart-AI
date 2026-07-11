@@ -29,3 +29,15 @@ export const getCategories = () =>
 
 export const getTopReviews = () =>
   axiosInstance.get('/api/v1/product/reviews/top')
+
+export const getAdminProducts = (params) => 
+  axiosInstance.get('/api/v1/product/admin/all', { params })
+
+export const getAdminSingleProduct = (id) => 
+  axiosInstance.get(`/api/v1/product/admin/single/${id}`)
+
+export const getAdminReviews = (params) =>
+  axiosInstance.get('/api/v1/product/admin/reviews', { params })
+
+export const deleteAdminReview = (reviewId) =>
+  axiosInstance.delete(`/api/v1/product/admin/reviews/${reviewId}`)

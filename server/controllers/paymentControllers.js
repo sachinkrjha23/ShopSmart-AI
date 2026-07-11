@@ -153,22 +153,12 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       };
     });
 
-    const taxPrice = 0;
-    const shippingPrice = itemsPrice > 500 ? 0 : 50;
-    let totalPrice = Math.round((itemsPrice + shippingPrice) * 100) / 100;
-
-    //  Amount Validation
-    if (totalPrice <= 0) {
+    if (itemsPrice <= 0) {
       throw new ErrorHandler("Invalid order amount.", 400);
     }
-    if (totalPrice > 500000) {
-      throw new ErrorHandler(
-        "Order amount exceeds maximum limit of ₹5,00,000.",
-        400,
-      );
-    }
 
-    //  Coupon Validation
+    //  Coupon Validation — moved before tax so tax is charged on the
+    //  post-discount amount, not the original sticker price
     let discountAmount = 0;
     let appliedCouponId = null;
 
@@ -245,12 +235,46 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
         }
       }
 
-      // Discount can never exceed total
-      discountAmount = Math.min(discountAmount, totalPrice);
+      // Discount can never exceed the value of the items themselves
+      discountAmount = Math.min(discountAmount, itemsPrice);
       discountAmount = Math.round(discountAmount * 100) / 100;
-
-      totalPrice = Math.round((totalPrice - discountAmount) * 100) / 100;
       appliedCouponId = coupon.id;
+    }
+
+    const discountedItemsPrice =
+      Math.round((itemsPrice - discountAmount) * 100) / 100;
+
+    //  Tax & Shipping — tax on the discounted price; free-shipping
+    //  threshold checked against the original cart value (see note above)
+    const { rows: settingsRows } = await client.query(
+      `SELECT shipping_fee, free_shipping_threshold, tax_rate FROM store_settings WHERE id = 1`,
+    );
+    const settings = settingsRows[0] || {
+      shipping_fee: 50,
+      free_shipping_threshold: 500,
+      tax_rate: 0,
+    };
+
+    const taxPrice =
+      Math.round(
+        discountedItemsPrice * (parseFloat(settings.tax_rate) / 100) * 100,
+      ) / 100;
+    const shippingPrice =
+      itemsPrice > parseFloat(settings.free_shipping_threshold)
+        ? 0
+        : parseFloat(settings.shipping_fee);
+    const totalPrice =
+      Math.round((discountedItemsPrice + taxPrice + shippingPrice) * 100) / 100;
+
+    //  Amount Validation — on the real final amount, after discount/tax/shipping
+    if (totalPrice <= 0) {
+      throw new ErrorHandler("Invalid order amount.", 400);
+    }
+    if (totalPrice > 500000) {
+      throw new ErrorHandler(
+        "Order amount exceeds maximum limit of ₹5,00,000.",
+        400,
+      );
     }
 
     //  Insert Order
@@ -776,6 +800,47 @@ export const cancelOrder = catchAsyncErrors(async (req, res, next) => {
 
 // 7. ADMIN — GET ALL ORDERS
 export const adminGetAllOrders = catchAsyncErrors(async (req, res, next) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 10;
+  const offset = (page - 1) * limit;
+  const { status, search } = req.query;
+
+  const conditions = [];
+  const values = [];
+  let index = 1;
+
+  if (status) {
+    conditions.push(`o.order_status = $${index}`);
+    values.push(status);
+    index++;
+  }
+
+  if (search) {
+    conditions.push(
+      `(o.id::text ILIKE $${index} OR u.name ILIKE $${index} OR u.email ILIKE $${index})`,
+    );
+    values.push(`%${search.trim()}%`);
+    index++;
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+
+  const totalResult = await database.query(
+    `SELECT COUNT(*) FROM orders o
+     LEFT JOIN users u ON u.id = o.buyer_id
+     ${whereClause}`,
+    values,
+  );
+  const totalOrders = parseInt(totalResult.rows[0].count);
+
+  values.push(limit);
+  const limitPlaceholder = `$${index}`;
+  index++;
+  values.push(offset);
+  const offsetPlaceholder = `$${index}`;
+
   const { rows: orders } = await database.query(
     `SELECT
        o.id, o.total_price, o.order_status, o.paid_at, o.created_at,
@@ -786,13 +851,61 @@ export const adminGetAllOrders = catchAsyncErrors(async (req, res, next) => {
      LEFT JOIN users         u  ON u.id = o.buyer_id
      LEFT JOIN payments      p  ON p.order_id = o.id
      LEFT JOIN shipping_info s  ON s.order_id = o.id
-     ORDER BY o.created_at DESC`,
+     ${whereClause}
+     ORDER BY o.created_at DESC
+     LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
+    values,
   );
 
   res.status(200).json({
     success: true,
-    totalOrders: orders.length,
+    totalOrders,
+    currentPage: page,
     orders,
+  });
+});
+
+// 7B. ADMIN — GET SINGLE ORDER (any buyer)
+export const adminGetSingleOrder = catchAsyncErrors(async (req, res, next) => {
+  const { orderId } = req.params;
+
+  if (!isValidUUID(orderId)) {
+    return next(new ErrorHandler("Invalid order ID.", 400));
+  }
+
+  const { rows } = await database.query(
+    `SELECT
+      o.id, o.buyer_id, o.total_price, o.tax_price, o.shipping_price,
+      o.order_status, o.coupon_code, o.discount_amount, o.paid_at, o.created_at,
+      u.name AS buyer_name, u.email AS buyer_email,
+      p.payment_status, p.razorpay_payment_id, p.payment_method,
+      s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
+      json_agg(
+        json_build_object(
+          'productId', oi.product_id,
+          'title',     oi.title,
+          'image',     oi.image,
+          'quantity',  oi.quantity,
+          'price',     oi.price
+        )
+      ) AS items
+     FROM orders o
+     LEFT JOIN users         u  ON u.id = o.buyer_id
+     LEFT JOIN payments      p  ON p.order_id  = o.id
+     LEFT JOIN shipping_info s  ON s.order_id  = o.id
+     LEFT JOIN order_items   oi ON oi.order_id = o.id
+     WHERE o.id = $1
+     GROUP BY o.id, u.id, p.id, s.id`,
+    [orderId],
+  );
+
+  if (rows.length === 0) {
+    return next(new ErrorHandler("Order not found.", 404));
+  }
+
+  res.status(200).json({
+    success: true,
+    order: rows[0],
   });
 });
 
@@ -817,17 +930,56 @@ export const adminUpdateOrderStatus = catchAsyncErrors(
       );
     }
 
+    const { rows: existingRows } = await database.query(
+      `SELECT order_status FROM orders WHERE id = $1`,
+      [orderId],
+    );
+
+    if (existingRows.length === 0) {
+      return next(new ErrorHandler("Order not found.", 404));
+    }
+
+    const currentStatus = existingRows[0].order_status;
+
+    if (currentStatus === "Delivered" || currentStatus === "Cancelled") {
+      return next(
+        new ErrorHandler(
+          `Order is already ${currentStatus} and cannot be changed further.`,
+          400,
+        ),
+      );
+    }
+
+    if (status === "Cancelled") {
+      return next(
+        new ErrorHandler(
+          "Use the cancel-order endpoint to cancel an order — it also handles stock restock and refund.",
+          400,
+        ),
+      );
+    }
+
+    const FORWARD_TRANSITIONS = {
+      Processing: ["Shipped"],
+      Shipped: ["Delivered"],
+    };
+
+    if (!FORWARD_TRANSITIONS[currentStatus]?.includes(status)) {
+      return next(
+        new ErrorHandler(
+          `Cannot move order from "${currentStatus}" to "${status}".`,
+          400,
+        ),
+      );
+    }
+
     const { rows } = await database.query(
       `UPDATE orders
-     SET order_status = $1
+     SET order_status = $1, updated_at = CURRENT_TIMESTAMP
      WHERE id = $2
      RETURNING *`,
       [status, orderId],
     );
-
-    if (rows.length === 0) {
-      return next(new ErrorHandler("Order not found.", 404));
-    }
 
     res.status(200).json({
       success: true,

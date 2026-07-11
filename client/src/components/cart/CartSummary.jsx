@@ -1,12 +1,20 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import useCart from '../../hooks/useCart'
+import { fetchSettings } from '../../store/slices/settingsSlice'
 import CouponInput from './CouponInput'
 import Button from '../ui/Button'
 
 const CartSummary = () => {
+  const dispatch = useDispatch()
   const { totalQuantity, totalPrice } = useCart()
   const { coupon, discount } = useSelector((state) => state.coupon)
+  const { settings } = useSelector((state) => state.settings)
+
+  useEffect(() => {
+    dispatch(fetchSettings())
+  }, [dispatch])
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('en-IN', {
@@ -16,10 +24,15 @@ const CartSummary = () => {
     }).format(price)
   }
 
-  const priceAfterDiscount = totalPrice - discount
+  const shippingFee = settings ? Number(settings.shipping_fee) : 50
+  const freeShippingThreshold = settings ? Number(settings.free_shipping_threshold) : 500
+  const taxRate = settings ? Number(settings.tax_rate) : 0
 
-  const shipping = totalPrice > 500 ? 0 : 50
-  const estimatedTotal = priceAfterDiscount + shipping
+  const priceAfterDiscount = totalPrice - discount
+  const shipping = totalPrice > freeShippingThreshold ? 0 : shippingFee
+  // ✅ FIX: Tax on discounted price
+  const tax = Math.round(priceAfterDiscount * (taxRate / 100) * 100) / 100
+  const estimatedTotal = priceAfterDiscount + shipping + tax
 
   const isEmpty = totalQuantity === 0
 
@@ -38,6 +51,13 @@ const CartSummary = () => {
         <div className="flex justify-between text-sm text-green-600 mb-2">
           <span>Coupon ({coupon.code})</span>
           <span>-{formatPrice(discount)}</span>
+        </div>
+      )}
+
+      {tax > 0 && (
+        <div className="flex justify-between text-sm text-gray-600 mb-2">
+          <span>Tax ({taxRate}%)</span>
+          <span>{formatPrice(tax)}</span>
         </div>
       )}
 

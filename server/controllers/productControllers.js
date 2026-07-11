@@ -3,6 +3,8 @@ import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { v2 as cloudinary } from "cloudinary";
 import database from "../database/db.js";
 import { getAIRecommendation } from "../utils/getAIRecommendation.js";
+const isValidUUID = (id) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 export const createProduct = catchAsyncErrors(async (req, res, next) => {
   const { name, description, price, category, stock } = req.body;
@@ -119,7 +121,7 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
   const limit = 10;
   const offset = (page - 1) * limit;
 
-  const conditions = [];
+  const conditions = ["p.is_active = TRUE"];
   let values = [];
   let index = 1;
 
@@ -258,7 +260,7 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     COUNT(r.id) AS review_count
     FROM products p
     LEFT JOIN reviews r ON p.id = r.product_id
-    WHERE p.created_at >= NOW() - INTERVAL '30 days'
+    WHERE p.created_at >= NOW() - INTERVAL '30 days' AND p.is_active = TRUE
     GROUP BY p.id
     ORDER BY p.created_at DESC
     LIMIT 8
@@ -271,7 +273,7 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     COUNT(r.id) AS review_count
     FROM products p
     LEFT JOIN reviews r ON p.id = r.product_id
-    WHERE p.ratings >= 4.5
+    WHERE p.ratings >= 4.5 AND p.is_active = TRUE
     GROUP BY p.id
     ORDER BY p.ratings DESC, p.created_at DESC
     LIMIT 8
@@ -432,61 +434,28 @@ export const updateProduct = catchAsyncErrors(async (req, res, next) => {
 export const deleteProduct = catchAsyncErrors(async (req, res, next) => {
   const { productId } = req.params;
 
-  const client = await database.connect();
+  const product = await database.query("SELECT * FROM products WHERE id = $1", [
+    productId,
+  ]);
 
-  try {
-    // Start transaction
-    await client.query("BEGIN");
-
-    // Check if product exists
-    const product = await client.query("SELECT * FROM products WHERE id = $1", [
-      productId,
-    ]);
-
-    if (product.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return next(new ErrorHandler("Product not found.", 404));
-    }
-
-    const images = product.rows[0].images || [];
-
-    // Delete product from database
-    const deleteResult = await client.query(
-      "DELETE FROM products WHERE id = $1 RETURNING *",
-      [productId],
-    );
-
-    if (deleteResult.rows.length === 0) {
-      return next(new ErrorHandler("Failed to delete product.", 500));
-    }
-
-    // Commit transaction - product is now permanently deleted
-    await client.query("COMMIT");
-
-    // Delete images from Cloudinary (after commit)
-    if (images && images.length > 0) {
-      for (const image of images) {
-        try {
-          await cloudinary.uploader.destroy(image.public_id);
-          console.log(`✅ Deleted: ${image.public_id}`);
-        } catch (error) {
-          console.error(`❌ Failed to delete ${image.public_id}:`, error);
-        }
-      }
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Product deleted successfully.",
-    });
-  } catch (error) {
-    // Rollback transaction on error
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    // Release client back to pool
-    client.release();
+  if (product.rows.length === 0) {
+    return next(new ErrorHandler("Product not found.", 404));
   }
+
+  const updated = await database.query(
+    `UPDATE products SET is_active = NOT is_active WHERE id = $1 RETURNING *`,
+    [productId],
+  );
+
+  const resultProduct = updated.rows[0];
+
+  res.status(200).json({
+    success: true,
+    message: resultProduct.is_active
+      ? "Product reactivated successfully."
+      : "Product deactivated successfully.",
+    product: resultProduct,
+  });
 });
 
 export const fetchSingleProduct = catchAsyncErrors(async (req, res, next) => {
@@ -513,7 +482,7 @@ export const fetchSingleProduct = catchAsyncErrors(async (req, res, next) => {
       FROM products p
       LEFT JOIN reviews r ON p.id = r.product_id
       LEFT JOIN users u ON r.user_id = u.id
-      WHERE p.id = $1
+      WHERE p.id = $1 AND p.is_active = TRUE
       GROUP BY p.id
     `,
     [productId],
@@ -1067,5 +1036,166 @@ export const getTopReviews = catchAsyncErrors(async (req, res, next) => {
   res.status(200).json({
     success: true,
     reviews: result.rows,
+  });
+});
+
+// ADMIN — GET ALL REVIEWS
+export const adminGetAllReviews = catchAsyncErrors(async (req, res, next) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 10;
+  const offset = (page - 1) * limit;
+  const { search } = req.query;
+
+  const conditions = [];
+  const values = [];
+  let index = 1;
+
+  if (search) {
+    conditions.push(
+      `(p.name ILIKE $${index} OR u.name ILIKE $${index} OR u.email ILIKE $${index})`,
+    );
+    values.push(`%${search.trim()}%`);
+    index++;
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+
+  const totalResult = await database.query(
+    `SELECT COUNT(*) FROM reviews r
+     JOIN users u ON u.id = r.user_id
+     JOIN products p ON p.id = r.product_id
+     ${whereClause}`,
+    values,
+  );
+  const totalReviews = parseInt(totalResult.rows[0].count);
+
+  values.push(limit);
+  const limitPlaceholder = `$${index}`;
+  index++;
+  values.push(offset);
+  const offsetPlaceholder = `$${index}`;
+
+  const { rows: reviews } = await database.query(
+    `SELECT
+       r.id, r.rating, r.comment, r.created_at,
+       u.name AS reviewer_name, u.email AS reviewer_email,
+       p.id AS product_id, p.name AS product_name
+     FROM reviews r
+     JOIN users u ON u.id = r.user_id
+     JOIN products p ON p.id = r.product_id
+     ${whereClause}
+     ORDER BY r.created_at DESC
+     LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
+    values,
+  );
+
+  res.status(200).json({
+    success: true,
+    totalReviews,
+    currentPage: page,
+    reviews,
+  });
+});
+
+// ADMIN — DELETE ANY REVIEW
+export const adminDeleteReview = catchAsyncErrors(async (req, res, next) => {
+  const { reviewId } = req.params;
+
+  if (!isValidUUID(reviewId)) {
+    return next(new ErrorHandler("Invalid review ID.", 400));
+  }
+
+  const review = await database.query(
+    "DELETE FROM reviews WHERE id = $1 RETURNING *",
+    [reviewId],
+  );
+
+  if (review.rows.length === 0) {
+    return next(new ErrorHandler("Review not found.", 404));
+  }
+
+  const productId = review.rows[0].product_id;
+
+  const allReviews = await database.query(
+    `SELECT AVG(rating) AS avg_rating FROM reviews WHERE product_id = $1`,
+    [productId],
+  );
+
+  const newAvgRating = allReviews.rows[0].avg_rating || 0;
+
+  await database.query(`UPDATE products SET ratings = $1 WHERE id = $2`, [
+    newAvgRating,
+    productId,
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: "Review deleted successfully.",
+    review: review.rows[0],
+  });
+});
+
+export const adminGetAllProducts = catchAsyncErrors(async (req, res, next) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 10;
+  const offset = (page - 1) * limit;
+  const { search } = req.query;
+
+  const conditions = [];
+  const values = [];
+  let index = 1;
+
+  if (search) {
+    conditions.push(`p.name ILIKE $${index}`);
+    values.push(`%${search.trim()}%`);
+    index++;
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const totalResult = await database.query(
+    `SELECT COUNT(*) FROM products p ${whereClause}`,
+    values,
+  );
+  const totalProducts = parseInt(totalResult.rows[0].count);
+
+  values.push(limit);
+  const limitPlaceholder = `$${index}`;
+  index++;
+  values.push(offset);
+  const offsetPlaceholder = `$${index}`;
+
+  const result = await database.query(
+    `SELECT p.* FROM products p ${whereClause}
+     ORDER BY p.created_at DESC
+     LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
+    values,
+  );
+
+  res.status(200).json({
+    success: true,
+    products: result.rows,
+    totalProducts,
+    currentPage: page,
+  });
+});
+
+export const adminGetSingleProduct = catchAsyncErrors(async (req, res, next) => {
+  const { productId } = req.params;
+
+  const result = await database.query(
+    `SELECT * FROM products WHERE id = $1`,
+    [productId],
+  );
+
+  if (result.rows.length === 0) {
+    return next(new ErrorHandler("Product not found.", 404));
+  }
+
+  res.status(200).json({
+    success: true,
+    product: result.rows[0],
   });
 });

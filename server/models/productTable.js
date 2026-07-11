@@ -17,6 +17,9 @@ export async function createProductsTable() {
         );
     `;
     await database.query(query);
+    await database.query(
+      `ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;`,
+    );
   } catch (error) {
     console.error("❌ Failed To Create Products Table.", error);
     process.exit(1);

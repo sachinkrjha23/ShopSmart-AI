@@ -8,6 +8,10 @@ import orderReducer from "./slices/orderSlice";
 import addressReducer from "./slices/addressSlice";
 import adminReducer from "./slices/adminSlice";
 import uiReducer from "./slices/uiSlice";
+import settingsReducer from "./slices/settingsSlice";
+import contactReducer from "./slices/contactSlice";
+
+
 
 const store = configureStore({
   reducer: {
@@ -20,6 +24,8 @@ const store = configureStore({
     coupon: couponReducer,
     admin: adminReducer,
     ui: uiReducer,
+    settings: settingsReducer,
+    contact: contactReducer
   },
 });
 

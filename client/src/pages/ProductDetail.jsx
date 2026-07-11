@@ -9,6 +9,8 @@ import Loader from "../components/ui/Loader";
 import ReviewCard from "../components/product/ReviewCard";
 import useCart from "../hooks/useCart";
 import WishlistButton from "../components/wishlist/WishlistButton";
+import ImageCarousel from "../components/ui/ImageCarousel";
+import ReviewForm from "../components/product/ReviewForm";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -16,8 +18,8 @@ const ProductDetail = () => {
   const { singleProduct: product, loading } = useSelector(
     (state) => state.product,
   );
+  const { user } = useSelector((state) => state.auth);
 
-  const [selectedImage, setSelectedImage] = useState(0);
   const { addItem, decreaseQuantity, getItemQuantity } = useCart();
 
   const cartQuantity = getItemQuantity(id);
@@ -26,10 +28,6 @@ const ProductDetail = () => {
     dispatch(fetchProduct(id));
     return () => dispatch(clearSingleProduct());
   }, [id, dispatch]);
-
-  useEffect(() => {
-    setSelectedImage(0);
-  }, [product?.id]);
 
   const handleAddToCart = () => {
     if (!isInStock) return toast.error("Product is out of stock");
@@ -71,6 +69,8 @@ const ProductDetail = () => {
   const isLowStock = product.stock > 0 && product.stock <= 10;
   const cartCap = Math.min(product.stock ?? 100, 100);
 
+  const carouselImages = images.map(img => ({ url: img.url }));
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -88,47 +88,17 @@ const ProductDetail = () => {
         {/* Main Content */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-            {/* Images */}
-            <div className="flex flex-col gap-4">
-              <div className="aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
-                {images.length > 0 ? (
-                  <img
-                    src={images[selectedImage]?.url}
-                    alt={product.name}
-                    className="w-full h-full object-contain p-4"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-300 text-sm">
-                    No image available
-                  </div>
-                )}
-              </div>
-
-              {images.length > 1 && (
-                <div className="flex gap-3 overflow-x-auto pb-1">
-                  {images.map((img, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setSelectedImage(index)}
-                      className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
-                        selectedImage === index
-                          ? "border-indigo-500"
-                          : "border-gray-100 hover:border-gray-300"
-                      }`}
-                    >
-                      <img
-                        src={img.url}
-                        alt={`${product.name} ${index + 1}`}
-                        className="w-full h-full object-contain p-1"
-                        onError={(e) => {
-                          e.target.style.display = "none";
-                        }}
-                      />
-                    </button>
-                  ))}
+            {/* Images - Swipeable Carousel */}
+            <div>
+              {carouselImages.length > 0 ? (
+                <ImageCarousel 
+                  key={product.id}
+                  images={carouselImages} 
+                  isEditMode={false}
+                />
+              ) : (
+                <div className="aspect-square rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center">
+                  <p className="text-gray-300 text-sm">No image available</p>
                 </div>
               )}
             </div>
@@ -221,6 +191,15 @@ const ProductDetail = () => {
             <h2 className="text-xl font-semibold text-gray-800 mb-6">
               Customer Reviews ({product.reviews?.length || 0})
             </h2>
+
+            <div className="mb-6">
+              <ReviewForm
+                productId={id}
+                existingReview={product.reviews?.find(
+                  (r) => r.reviewer?.id === user?.id,
+                )}
+              />
+            </div>
 
             {product.reviews?.length === 0 && (
               <p className="text-sm text-gray-500">
