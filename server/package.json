@@ -36,5 +36,8 @@
   "bugs": {
     "url": "https://github.com/sachinkrjha23/ShopSmart-AI/issues"
   },
-  "homepage": "https://github.com/sachinkrjha23/ShopSmart-AI#readme"
+  "homepage": "https://github.com/sachinkrjha23/ShopSmart-AI#readme",
+  "devDependencies": {
+    "@types/pdfkit": "^0.17.6"
+  }
 }

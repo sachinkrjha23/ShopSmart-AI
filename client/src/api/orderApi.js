@@ -17,3 +17,8 @@ export const updateOrderStatus = (orderId, status) =>
 
 export const adminCancelOrder = (orderId) =>
   axiosInstance.delete(`/api/v1/payment/admin/cancel/${orderId}`)
+
+export const downloadInvoice = (orderId) =>
+  axiosInstance.get(`/api/v1/payment/order/${orderId}/invoice`, {
+    responseType: 'blob',
+  })

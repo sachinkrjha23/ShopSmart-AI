@@ -41,3 +41,6 @@ export const getAdminReviews = (params) =>
 
 export const deleteAdminReview = (reviewId) =>
   axiosInstance.delete(`/api/v1/product/admin/reviews/${reviewId}`)
+
+export const checkProductsAvailability = (productIds) =>
+  axiosInstance.post('/api/v1/product/check-availability', { productIds })

@@ -4,6 +4,8 @@ import database from "../database/db.js";
 import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
 import { applyPaymentSuccessEffects } from "../utils/applyPaymentSuccessEffects.js";
+import { generateInvoiceBuffer } from "../utils/generateInvoice.js";
+
 
 const isValidUUID = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -117,12 +119,26 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
     //  Fetch Real Prices From DB
     const productIds = cartItems.map((item) => item.productId);
     const { rows: products } = await client.query(
-      `SELECT id, name, price, stock FROM products WHERE id = ANY($1::uuid[])`,
+      `SELECT id, name, price, stock FROM products WHERE id = ANY($1::uuid[]) AND is_active = TRUE`,
       [productIds],
     );
 
     if (products.length !== productIds.length) {
-      throw new ErrorHandler("One or more products not found.", 400);
+      const foundIds = products.map((p) => p.id);
+      const missingIds = productIds.filter((id) => !foundIds.includes(id));
+
+      const { rows: missingProducts } = await client.query(
+        `SELECT name FROM products WHERE id = ANY($1::uuid[])`,
+        [missingIds],
+      );
+
+      const names = missingProducts.map((p) => p.name);
+      const message =
+        names.length > 0
+          ? `The following item(s) are no longer available: ${names.join(", ")}. Please remove them from your cart to continue.`
+          : "One or more items in your cart are no longer available. Please remove them from your cart to continue.";
+
+      throw new ErrorHandler(message, 400);
     }
 
     //  Calculate Totals
@@ -260,7 +276,7 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
         discountedItemsPrice * (parseFloat(settings.tax_rate) / 100) * 100,
       ) / 100;
     const shippingPrice =
-      itemsPrice > parseFloat(settings.free_shipping_threshold)
+      discountedItemsPrice > parseFloat(settings.free_shipping_threshold)
         ? 0
         : parseFloat(settings.shipping_fee);
     const totalPrice =
@@ -1168,5 +1184,66 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
     );
   } finally {
     client.release();
+  }
+});
+
+
+// GET ORDER INVOICE (PDF)
+export const getOrderInvoice = catchAsyncErrors(async (req, res, next) => {
+  const { orderId } = req.params;
+
+  if (!isValidUUID(orderId)) {
+    return next(new ErrorHandler("Invalid order ID.", 400));
+  }
+
+  try {
+    const { rows } = await database.query(
+      `SELECT
+        o.id, o.total_price, o.tax_price, o.shipping_price,
+        o.order_status, o.coupon_code, o.discount_amount, o.paid_at, o.created_at,
+        u.name AS buyer_name, u.email AS buyer_email,
+        p.payment_status,
+        s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
+        json_agg(
+          json_build_object(
+            'title', oi.title,
+            'quantity', oi.quantity,
+            'price', oi.price,
+            'image', oi.image
+          )
+        ) AS items
+       FROM orders o
+       LEFT JOIN users         u  ON u.id = o.buyer_id
+       LEFT JOIN payments      p  ON p.order_id  = o.id
+       LEFT JOIN shipping_info s  ON s.order_id  = o.id
+       LEFT JOIN order_items   oi ON oi.order_id = o.id
+       WHERE o.id = $1 AND o.buyer_id = $2
+       GROUP BY o.id, u.id, p.id, s.id`,
+      [orderId, req.user.id],
+    );
+
+
+    if (rows.length === 0) {
+      return next(new ErrorHandler("Order not found.", 404));
+    }
+
+    const order = rows[0];
+
+    if (order.payment_status !== "Paid") {
+      return next(new ErrorHandler("Invoice is only available for paid orders.", 400));
+    }
+
+    const pdfBuffer = await generateInvoiceBuffer(order);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename=invoice-${order.id.slice(0, 8)}.pdf`,
+      "Content-Length": pdfBuffer.length,
+    });
+
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("❌ Error in getOrderInvoice:", error.message);
+    console.error("Stack:", error.stack);
+    return next(new ErrorHandler(error.message || "Failed to generate invoice", 500));
   }
 });

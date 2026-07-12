@@ -1199,3 +1199,30 @@ export const adminGetSingleProduct = catchAsyncErrors(async (req, res, next) => 
     product: result.rows[0],
   });
 });
+
+// Product Availability
+
+export const checkProductsAvailability = catchAsyncErrors(async (req, res, next) => {
+  const { productIds } = req.body;
+
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return res.status(200).json({ success: true, unavailable: [] });
+  }
+
+  const { rows } = await database.query(
+    `SELECT id, name, is_active FROM products WHERE id = ANY($1::uuid[])`,
+    [productIds],
+  );
+
+  const unavailable = rows
+    .filter((p) => !p.is_active)
+    .map((p) => ({ id: p.id, name: p.name }));
+
+  const foundIds = rows.map((p) => p.id);
+  const goneIds = productIds.filter((id) => !foundIds.includes(id));
+
+  res.status(200).json({
+    success: true,
+    unavailable: [...unavailable, ...goneIds.map((id) => ({ id, name: null }))],
+  });
+});

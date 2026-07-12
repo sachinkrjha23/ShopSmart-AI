@@ -13,7 +13,7 @@ import { createCategoriesTable } from "../models/categoryTable.js";
 import { createPendingRegistrationsTable } from "../models/pendingRegistrationsTable.js";
 import { createStoreSettingsTable } from "../models/storeSettingsTable.js";
 import { createContactMessagesTable } from "../models/contactMessagesTable.js";
-
+import { createSellersTable } from "../models/sellersTable.js";
 
 
 
@@ -38,7 +38,7 @@ export const createTables = async() =>{
         await createPendingRegistrationsTable();
         await createStoreSettingsTable();
         await createContactMessagesTable();
-
+        await createSellersTable();
 
 
         await database.query(`

@@ -1,6 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { createProduct , fetchAllProducts, updateProduct, deleteProduct, fetchSingleProduct, postProductReview, deleteReview , fetchAIFilteredProducts, getCategories, getTopReviews, adminGetAllProducts, adminGetSingleProduct, adminGetAllReviews, adminDeleteReview } from "../controllers/productControllers.js";
+import { createProduct , fetchAllProducts, updateProduct, deleteProduct, fetchSingleProduct, postProductReview, deleteReview , fetchAIFilteredProducts, getCategories, getTopReviews, adminGetAllProducts, adminGetSingleProduct, adminGetAllReviews, adminDeleteReview, checkProductsAvailability } from "../controllers/productControllers.js";
 
 import { authorizedRoles, isAuthenticated} from "../middlewares/authMiddleware.js";
 
@@ -40,5 +40,7 @@ router.get("/admin/single/:productId", isAuthenticated, authorizedRoles("Admin")
 router.get("/admin/reviews", isAuthenticated, authorizedRoles("Admin"), adminGetAllReviews);
 
 router.delete("/admin/reviews/:reviewId", isAuthenticated, authorizedRoles("Admin"), adminDeleteReview);
+
+router.post("/check-availability", isAuthenticated, checkProductsAvailability);
 
 export default router;

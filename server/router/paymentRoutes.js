@@ -5,8 +5,8 @@ import {
   createOrder, verifyPayment, handleWebhook, getMyOrders, getSingleOrder,
   adminGetAllOrders, adminGetSingleOrder, adminUpdateOrderStatus,
   adminInitiateRefund, cancelOrder, adminCancelOrder,
+  getOrderInvoice 
 } from "../controllers/paymentControllers.js";
-
 
 const paymentLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -22,24 +22,32 @@ const verifyLimiter = rateLimit({
 
 const router = express.Router();
 
-router.post("/webhook",express.raw({ type: "application/json" }),handleWebhook);
+// Webhook (raw body)
+router.post("/webhook", express.raw({ type: "application/json" }), handleWebhook);
 
 router.use(express.json());
 
-// USER ROUTES 
+// ============================================================
+// USER ROUTES
+// ============================================================
 router.post("/create-order", isAuthenticated, paymentLimiter, createOrder);
-router.post("/verify",       isAuthenticated, verifyLimiter,  verifyPayment);
+router.post("/verify", isAuthenticated, verifyLimiter, verifyPayment);
 router.get("/my-orders", isAuthenticated, getMyOrders);
+
+// ✅ IMPORTANT: Specific route BEFORE the catch-all
+router.get("/order/:orderId/invoice", isAuthenticated, getOrderInvoice);
 router.get("/order/:orderId", isAuthenticated, getSingleOrder);
-router.delete("/cancel/:orderId",        isAuthenticated, cancelOrder);
 
+router.delete("/cancel/:orderId", isAuthenticated, cancelOrder);
 
-// ADMIN ROUTES 
+// ============================================================
+// ADMIN ROUTES
+// ============================================================
 router.get("/admin/all-orders", isAuthenticated, authorizedRoles("Admin"), adminGetAllOrders);
 router.get("/admin/order/:orderId", isAuthenticated, authorizedRoles("Admin"), adminGetSingleOrder);
 router.put("/admin/order/:orderId", isAuthenticated, authorizedRoles("Admin"), adminUpdateOrderStatus);
 router.post("/admin/refund", isAuthenticated, authorizedRoles("Admin"), adminInitiateRefund);
-router.delete("/admin/cancel/:orderId",  isAuthenticated, authorizedRoles("Admin"), adminCancelOrder);
+router.delete("/admin/cancel/:orderId", isAuthenticated, authorizedRoles("Admin"), adminCancelOrder);
 
 
 export default router;

@@ -29,8 +29,7 @@ const CartSummary = () => {
   const taxRate = settings ? Number(settings.tax_rate) : 0
 
   const priceAfterDiscount = totalPrice - discount
-  const shipping = totalPrice > freeShippingThreshold ? 0 : shippingFee
-  // ✅ FIX: Tax on discounted price
+  const shipping = priceAfterDiscount > freeShippingThreshold ? 0 : shippingFee  
   const tax = Math.round(priceAfterDiscount * (taxRate / 100) * 100) / 100
   const estimatedTotal = priceAfterDiscount + shipping + tax
 
