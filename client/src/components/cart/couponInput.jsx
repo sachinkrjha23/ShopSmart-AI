@@ -11,7 +11,7 @@ const CouponInput = () => {
   const dispatch = useDispatch();
   const [code, setCode] = useState("");
   const { totalPrice, items } = useSelector((state) => state.cart);
-  const { coupon, discount, loading, error, appliedForTotal, pendingCode } =
+  const { coupon, discount, loading, error, appliedForTotal, pendingCode, eligibleAmount } =
     useSelector((state) => state.coupon);
 
   const buildCartItems = () =>
@@ -57,22 +57,31 @@ const CouponInput = () => {
 
   if (coupon) {
     return (
-      <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-3">
-        <div className="text-sm">
-          <span className="font-medium text-green-700">{coupon.code}</span>
-          <span className="text-green-600 ml-2">
-            {coupon.type === "percentage"
-              ? `Up to ${coupon.discountValue}% off applied`
-              : `₹${coupon.discountValue} off applied`}
-          </span>
+      <div className="flex flex-col gap-1 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm">
+            <span className="font-medium text-green-700">{coupon.code}</span>
+            <span className="text-green-600 ml-2">
+              {coupon.type === "percentage"
+                ? `Up to ${coupon.discountValue}% off applied`
+                : `₹${coupon.discountValue} off applied`}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="text-xs text-red-500 hover:underline"
+          >
+            Remove
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleRemove}
-          className="text-xs text-red-500 hover:underline"
-        >
-          Remove
-        </button>
+        {coupon.sellerScoped && eligibleAmount < totalPrice && (
+          <p className="text-xs text-green-600">
+            Applies only to items from{" "}
+            <span className="font-medium">{coupon.sellerName || "this seller"}</span>
+            {" "}— not your full cart.
+          </p>
+        )}
       </div>
     );
   }

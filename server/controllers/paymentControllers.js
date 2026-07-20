@@ -684,13 +684,17 @@ export const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
           'image',     oi.image,
           'quantity',  oi.quantity,
           'price',     oi.price,
-          'fulfillmentStatus', oi.fulfillment_status
+          'fulfillmentStatus', oi.fulfillment_status,
+          'sellerId', p2.seller_id,
+          'sellerStoreName', s2.store_name
         )
       ) AS items
      FROM orders o
      LEFT JOIN payments      p  ON p.order_id  = o.id
      LEFT JOIN shipping_info s  ON s.order_id  = o.id
-     LEFT JOIN order_items   oi ON oi.order_id = o.id
+     LEFT JOIN order_items oi ON oi.order_id = o.id
+     LEFT JOIN products p2 ON p2.id = oi.product_id
+     LEFT JOIN sellers s2 ON s2.id = p2.seller_id
      WHERE o.id = $1 AND o.buyer_id = $2
      GROUP BY o.id, p.id, s.id`,
     [orderId, buyerId],

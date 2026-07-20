@@ -14,6 +14,7 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Button from "../components/ui/Button";
 import Loader from "../components/ui/Loader";
 import { downloadInvoice } from "../api/orderApi";
+import RateSellerModal from "../components/order/RateSellerModal";
 
 const PAYMENT_TAGS = {
   Pending: {
@@ -42,6 +43,8 @@ const OrderDetail = () => {
   } = useSelector((state) => state.order);
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [rateModalOpen, setRateModalOpen] = useState(false);
+  const [ratingSeller, setRatingSeller] = useState(null);
 
   useEffect(() => {
     dispatch(fetchSingleOrder(id));
@@ -99,6 +102,19 @@ const OrderDetail = () => {
   const itemsSubtotal = items.reduce(
     (sum, item) => sum + Number(item.price) * item.quantity,
     0,
+  );
+
+  const deliveredSellers = Array.from(
+    new Map(
+      items
+        .filter(
+          (item) => item.fulfillmentStatus === "Delivered" && item.sellerId,
+        )
+        .map((item) => [
+          item.sellerId,
+          { id: item.sellerId, name: item.sellerStoreName },
+        ]),
+    ).values(),
   );
 
   return (
@@ -176,6 +192,24 @@ const OrderDetail = () => {
             </div>
           ))}
         </div>
+
+        {deliveredSellers.length > 0 && (
+          <div className="flex flex-wrap gap-3 pt-4 mt-2 border-t border-gray-100">
+            {deliveredSellers.map((seller) => (
+              <button
+                key={seller.id}
+                type="button"
+                onClick={() => {
+                  setRatingSeller(seller);
+                  setRateModalOpen(true);
+                }}
+                className="text-sm text-indigo-600 hover:underline"
+              >
+                ★ Rate {seller.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
@@ -274,6 +308,13 @@ const OrderDetail = () => {
         message="Are you sure you want to cancel this order? This cannot be undone."
         confirmLabel="Cancel Order"
         variant="danger"
+      />
+
+      <RateSellerModal
+        isOpen={rateModalOpen}
+        onClose={() => setRateModalOpen(false)}
+        sellerId={ratingSeller?.id}
+        sellerName={ratingSeller?.name}
       />
     </div>
   );

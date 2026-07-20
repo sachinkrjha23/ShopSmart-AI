@@ -68,3 +68,9 @@ export const toggleSellerCoupon = (id) =>
 
 export const deleteSellerCoupon = (id) =>
   axiosInstance.delete(`/api/v1/seller/coupons/${id}`)
+
+export const rateSellerApi = (sellerId, data) =>
+  axiosInstance.put(`/api/v1/seller/rate/${sellerId}`, data)
+
+export const getMySellerRatingApi = (sellerId) =>
+  axiosInstance.get(`/api/v1/seller/rate/${sellerId}/mine`)

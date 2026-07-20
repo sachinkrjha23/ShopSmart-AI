@@ -43,6 +43,15 @@ export const validateCoupon = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("This coupon has expired.", 400));
   }
 
+  let sellerStoreName = null;
+  if (coupon.seller_id) {
+    const sellerResult = await database.query(
+      `SELECT store_name FROM sellers WHERE id = $1`,
+      [coupon.seller_id],
+    );
+    sellerStoreName = sellerResult.rows[0]?.store_name || null;
+  }
+
   const productIds = cartItems.map((item) => item.productId);
   const { rows: products } = await database.query(
     `SELECT id, price, seller_id FROM products WHERE id = ANY($1::uuid[]) AND is_active = TRUE`,
@@ -128,6 +137,7 @@ export const validateCoupon = catchAsyncErrors(async (req, res, next) => {
       type: coupon.type,
       discountValue: coupon.discount_value,
       sellerScoped: !!coupon.seller_id,
+      sellerName: sellerStoreName,
     },
     discountAmount: discountAmount.toFixed(2),
     cartTotal: cartTotal.toFixed(2),

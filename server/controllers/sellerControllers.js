@@ -143,9 +143,13 @@ export const getPublicSellerProfile = catchAsyncErrors(async (req, res, next) =>
   }
 
   const result = await database.query(
-    `SELECT id, store_name, description, created_at
-     FROM sellers
-     WHERE id = $1 AND status = 'Approved'`,
+    `SELECT s.id, s.store_name, s.description, s.created_at,
+            COALESCE(AVG(sr.rating), 0) AS avg_rating,
+            COUNT(sr.id) AS rating_count
+     FROM sellers s
+     LEFT JOIN seller_ratings sr ON sr.seller_id = s.id
+     WHERE s.id = $1 AND s.status = 'Approved'
+     GROUP BY s.id`,
     [id],
   );
 
@@ -153,9 +157,15 @@ export const getPublicSellerProfile = catchAsyncErrors(async (req, res, next) =>
     return next(new ErrorHandler("Seller not found.", 404));
   }
 
+  const seller = result.rows[0];
+
   res.status(200).json({
     success: true,
-    seller: result.rows[0],
+    seller: {
+      ...seller,
+      avg_rating: parseFloat(seller.avg_rating).toFixed(1),
+      rating_count: parseInt(seller.rating_count),
+    },
   });
 });
 
@@ -1454,5 +1464,70 @@ export const deleteSellerCoupon = catchAsyncErrors(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: `Coupon "${existing.rows[0].code}" deleted successfully.`,
+  });
+});
+
+// SELLER — RATE (CREATE OR UPDATE, upsert)
+export const rateSeller = catchAsyncErrors(async (req, res, next) => {
+  const buyerId = req.user.id;
+  const { sellerId } = req.params;
+  const { rating, review } = req.body;
+
+  if (!isValidUUID(sellerId)) {
+    return next(new ErrorHandler("Invalid seller ID.", 400));
+  }
+  if (!rating || rating < 1 || rating > 5) {
+    return next(new ErrorHandler("Rating must be between 1 and 5.", 400));
+  }
+
+  const eligibility = await database.query(
+    `SELECT COUNT(*) FROM order_items oi
+     JOIN products p ON p.id = oi.product_id
+     JOIN orders o ON o.id = oi.order_id
+     WHERE o.buyer_id = $1 AND p.seller_id = $2 AND oi.fulfillment_status = 'Delivered'`,
+    [buyerId, sellerId],
+  );
+
+  if (parseInt(eligibility.rows[0].count) === 0) {
+    return next(
+      new ErrorHandler(
+        "You can only rate sellers after an item from them has been delivered to you.",
+        403,
+      ),
+    );
+  }
+
+  const result = await database.query(
+    `INSERT INTO seller_ratings (seller_id, buyer_id, rating, review)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (seller_id, buyer_id)
+     DO UPDATE SET rating = EXCLUDED.rating, review = EXCLUDED.review, updated_at = CURRENT_TIMESTAMP
+     RETURNING *`,
+    [sellerId, buyerId, rating, review || null],
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Rating submitted successfully.",
+    rating: result.rows[0],
+  });
+});
+
+export const getMySellerRating = catchAsyncErrors(async (req, res, next) => {
+  const buyerId = req.user.id;
+  const { sellerId } = req.params;
+
+  if (!isValidUUID(sellerId)) {
+    return next(new ErrorHandler("Invalid seller ID.", 400));
+  }
+
+  const result = await database.query(
+    `SELECT * FROM seller_ratings WHERE seller_id = $1 AND buyer_id = $2`,
+    [sellerId, buyerId],
+  );
+
+  res.status(200).json({
+    success: true,
+    rating: result.rows[0] || null,
   });
 });

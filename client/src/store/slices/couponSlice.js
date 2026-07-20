@@ -103,6 +103,7 @@ const initialState = {
   appliedForTotal: null,
   pendingCode: null,
   adminCoupons: [],
+  eligibleAmount: null,
   loading: false,
   error: null,
 };
@@ -116,6 +117,7 @@ const couponSlice = createSlice({
       state.discount = 0;
       state.finalAmount = null;
       state.appliedForTotal = null;
+      state.eligibleAmount = null;
       state.error = null;
     },
     clearCouponError: (state) => {
@@ -137,6 +139,7 @@ const couponSlice = createSlice({
         state.discount = Number(action.payload.discountAmount);
         state.finalAmount = Number(action.payload.finalAmount);
         state.appliedForTotal = Number(action.payload.cartTotal);
+        state.eligibleAmount = Number(action.payload.eligibleAmount);
       })
       .addCase(applyCoupon.rejected, (state, action) => {
         state.loading = false;
@@ -145,6 +148,7 @@ const couponSlice = createSlice({
         state.discount = 0;
         state.finalAmount = null;
         state.appliedForTotal = null;
+        state.eligibleAmount = null;
       });
 
     const restorePendingCode = (state, action) => {
@@ -168,6 +172,7 @@ const couponSlice = createSlice({
         state.discount = 0;
         state.finalAmount = null;
         state.appliedForTotal = null;
+        state.eligibleAmount = null;
         state.pendingCode = null;
       });
 

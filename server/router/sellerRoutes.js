@@ -23,7 +23,9 @@ import {
   getSellerCoupons,
   updateSellerCoupon,
   toggleSellerCoupon,
-  deleteSellerCoupon
+  deleteSellerCoupon,
+  rateSeller,
+  getMySellerRating
 } from "../controllers/sellerControllers.js";
 
 const router = express.Router();
@@ -51,6 +53,9 @@ router.get("/coupons", isAuthenticated, isApprovedSeller, getSellerCoupons);
 router.put("/coupons/:couponId", isAuthenticated, isApprovedSeller, updateSellerCoupon);
 router.put("/coupons/toggle/:couponId", isAuthenticated, isApprovedSeller, toggleSellerCoupon);
 router.delete("/coupons/:couponId", isAuthenticated, isApprovedSeller, deleteSellerCoupon);
+
+router.put("/rate/:sellerId", isAuthenticated, rateSeller);
+router.get("/rate/:sellerId/mine", isAuthenticated, getMySellerRating);
 
 // Admin-facing
 router.get("/admin/all", isAuthenticated, authorizedRoles("Admin"), adminGetAllSellers);

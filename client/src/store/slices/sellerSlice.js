@@ -22,6 +22,8 @@ import {
   updateSellerCoupon,
   toggleSellerCoupon,
   deleteSellerCoupon,
+  rateSellerApi,
+  getMySellerRatingApi,
 } from "../../api/sellerApi";
 import { cancelSellerOrderItem as cancelSellerOrderItemApi } from "../../api/sellerApi";
 
@@ -349,6 +351,34 @@ export const removeSellerCoupon = createAsyncThunk(
   },
 );
 
+export const submitSellerRating = createAsyncThunk(
+  "seller/submitSellerRating",
+  async ({ sellerId, data }, { rejectWithValue }) => {
+    try {
+      const response = await rateSellerApi(sellerId, data);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to submit rating",
+      );
+    }
+  },
+);
+
+export const fetchMySellerRating = createAsyncThunk(
+  "seller/fetchMySellerRating",
+  async (sellerId, { rejectWithValue }) => {
+    try {
+      const response = await getMySellerRatingApi(sellerId);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch rating",
+      );
+    }
+  },
+);
+
 // INITIAL STATE
 
 const initialState = {
@@ -384,6 +414,8 @@ const initialState = {
   publicSellerProfile: null,
 
   sellerCoupons: [],
+
+  myRating: null,
 
   loading: false,
   error: null,
@@ -748,6 +780,19 @@ const sellerSlice = createSlice({
         );
       })
       .addCase(removeSellerCoupon.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+
+      .addCase(fetchMySellerRating.fulfilled, (state, action) => {
+        state.myRating = action.payload.rating;
+      })
+      .addCase(fetchMySellerRating.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+      .addCase(submitSellerRating.fulfilled, (state, action) => {
+        state.myRating = action.payload.rating;
+      })
+      .addCase(submitSellerRating.rejected, (state, action) => {
         state.error = action.payload;
       });
   }, 
