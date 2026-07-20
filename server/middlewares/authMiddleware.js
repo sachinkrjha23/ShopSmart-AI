@@ -40,3 +40,19 @@ export const authorizedRoles = (...roles) => {
     next();
   };
 };
+
+export const isApprovedSeller = catchAsyncErrors(async (req, res, next) => {
+  const result = await database.query(
+    `SELECT * FROM sellers WHERE user_id = $1 AND status = 'Approved'`,
+    [req.user.id],
+  );
+
+  if (result.rows.length === 0) {
+    return next(
+      new ErrorHandler("You must be an approved seller to access this resource.", 403),
+    );
+  }
+
+  req.seller = result.rows[0];
+  next();
+});

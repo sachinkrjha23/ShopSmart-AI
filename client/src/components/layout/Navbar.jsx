@@ -15,6 +15,7 @@ const Navbar = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const { mySeller } = useSelector((state) => state.seller);
   const { items } = useSelector((state) => state.cart);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -131,6 +132,15 @@ const Navbar = () => {
                           className="block px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
                         >
                           Admin Dashboard
+                        </Link>
+                      )}
+                      {mySeller?.status === "Approved" && (
+                        <Link
+                          to="/seller"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="block px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        >
+                          Seller Dashboard
                         </Link>
                       )}
                       <Link

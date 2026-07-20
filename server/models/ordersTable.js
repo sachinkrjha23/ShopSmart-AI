@@ -20,6 +20,9 @@ export async function createOrdersTable() {
 `;
 
     await database.query(query);
+    await database.query(
+      `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pricing_mode TEXT DEFAULT NULL CHECK (pricing_mode IN ('inclusive'));`,
+    );
   } catch (error) {
     console.error("❌ Failed To Create Orders Table.", error);
     process.exit(1);

@@ -9,6 +9,7 @@ import {
 } from "../store/slices/orderSlice";
 import OrderStatusBadge from "../components/order/OrderStatusBadge";
 import OrderTimeline from "../components/order/OrderTimeline";
+import Badge from "../components/ui/Badge";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Button from "../components/ui/Button";
 import Loader from "../components/ui/Loader";
@@ -21,6 +22,13 @@ const PAYMENT_TAGS = {
   },
   Failed: { label: "Payment Failed", className: "bg-red-50 text-red-700" },
   Refunded: { label: "Refunded", className: "bg-blue-50 text-blue-700" },
+};
+
+const FULFILLMENT_VARIANTS = {
+  Pending: "default",
+  Shipped: "info",
+  Delivered: "success",
+  Cancelled: "danger",
 };
 
 const OrderDetail = () => {
@@ -88,10 +96,10 @@ const OrderDetail = () => {
   const items = (order.items || []).filter(Boolean);
   const paymentTag = PAYMENT_TAGS[order.payment_status];
   const canCancel = order.order_status === "Processing";
-  const subtotal =
-    Number(order.total_price) +
-    Number(order.discount_amount || 0) -
-    Number(order.shipping_price);
+  const itemsSubtotal = items.reduce(
+    (sum, item) => sum + Number(item.price) * item.quantity,
+    0,
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -153,9 +161,18 @@ const OrderDetail = () => {
                 </p>
                 <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
               </div>
-              <p className="text-sm font-medium text-gray-900">
-                ₹{(Number(item.price) * item.quantity).toLocaleString("en-IN")}
-              </p>
+              <div className="flex flex-col items-end gap-1">
+                <p className="text-sm font-medium text-gray-900">
+                  ₹
+                  {(Number(item.price) * item.quantity).toLocaleString("en-IN")}
+                </p>
+                {item.fulfillmentStatus && (
+                  <Badge
+                    label={item.fulfillmentStatus}
+                    variant={FULFILLMENT_VARIANTS[item.fulfillmentStatus]}
+                  />
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -179,7 +196,7 @@ const OrderDetail = () => {
         <div className="flex flex-col gap-2 text-sm">
           <div className="flex justify-between text-gray-600">
             <span>Subtotal</span>
-            <span>₹{subtotal.toLocaleString("en-IN")}</span>
+            <span>₹{itemsSubtotal.toLocaleString("en-IN")}</span>
           </div>
           {Number(order.discount_amount) > 0 && (
             <div className="flex justify-between text-green-600">
@@ -189,6 +206,12 @@ const OrderDetail = () => {
               <span>
                 -₹{Number(order.discount_amount).toLocaleString("en-IN")}
               </span>
+            </div>
+          )}
+          {order.pricing_mode !== "inclusive" && (
+            <div className="flex justify-between text-gray-600">
+              <span>Tax</span>
+              <span>₹{Number(order.tax_price).toLocaleString("en-IN")}</span>
             </div>
           )}
           <div className="flex justify-between text-gray-600">

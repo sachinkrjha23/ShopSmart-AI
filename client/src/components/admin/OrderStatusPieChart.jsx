@@ -2,6 +2,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 export const STATUS_COLORS = {
   Processing: "#3b82f6",
+  Pending: "#3b82f6",
   Shipped: "#f59e0b",
   Delivered: "#22c55e",
   Cancelled: "#ef4444",

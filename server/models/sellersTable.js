@@ -20,6 +20,15 @@ export async function createSellersTable() {
     await database.query(
       `ALTER TABLE products ADD COLUMN IF NOT EXISTS seller_id UUID REFERENCES sellers(id) ON DELETE SET NULL;`,
     );
+    await database.query(
+      `ALTER TABLE sellers ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP DEFAULT NULL;`,
+    );
+    await database.query(
+      `ALTER TABLE sellers ADD COLUMN IF NOT EXISTS resolution_notes TEXT DEFAULT NULL;`,
+    );
+    await database.query(
+      `ALTER TABLE products ADD COLUMN IF NOT EXISTS auto_deactivated BOOLEAN NOT NULL DEFAULT FALSE;`,
+    );
   } catch (error) {
     console.error("❌ Failed To Create Sellers Table.", error);
     process.exit(1);

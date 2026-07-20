@@ -14,6 +14,7 @@ import addressRouter from "./router/addressRoutes.js";
 import couponRouter from "./router/couponRoutes.js";
 import settingsRouter from "./router/settingsRoutes.js";
 import contactRouter from "./router/contactRoutes.js";
+import sellerRouter from "./router/sellerRoutes.js";
 
 
 
@@ -49,6 +50,7 @@ app.use("/api/v1/address", addressRouter);
 app.use("/api/v1/coupon", couponRouter);
 app.use("/api/v1/settings", settingsRouter);
 app.use("/api/v1/contact", contactRouter);
+app.use("/api/v1/seller", sellerRouter);
 
 
 await createTables();

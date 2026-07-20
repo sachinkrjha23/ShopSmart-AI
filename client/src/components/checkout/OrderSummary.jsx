@@ -27,12 +27,10 @@ const OrderSummary = () => {
   const freeShippingThreshold = settings
     ? Number(settings.free_shipping_threshold)
     : 500;
-  const taxRate = settings ? Number(settings.tax_rate) : 0;
 
   const priceAfterDiscount = totalPrice - discount;
-  const shipping = priceAfterDiscount > freeShippingThreshold ? 0 : shippingFee;  
-  const tax = Math.round(priceAfterDiscount * (taxRate / 100) * 100) / 100;
-  const estimatedTotal = priceAfterDiscount + shipping + tax;
+  const shipping = priceAfterDiscount > freeShippingThreshold ? 0 : shippingFee;
+  const estimatedTotal = priceAfterDiscount + shipping;
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5">
@@ -78,12 +76,6 @@ const OrderSummary = () => {
           <div className="flex justify-between text-green-600">
             <span>Coupon ({coupon.code})</span>
             <span>-{formatPrice(discount)}</span>
-          </div>
-        )}
-        {tax > 0 && (
-          <div className="flex justify-between text-gray-600">
-            <span>Tax ({taxRate}%)</span>
-            <span>{formatPrice(tax)}</span>
           </div>
         )}
         <div className="flex justify-between text-gray-600">

@@ -289,6 +289,10 @@ const productSlice = createSlice({
     clearAdminSingleProduct: (state) => {
       state.adminSingleProduct = null;
     },
+    clearProducts: (state) => {
+      state.products = [];
+      state.pagination = { currentPage: 1, totalPages: 1, totalProducts: 0 };
+    },
   },
 
   extraReducers: (builder) => {
@@ -525,7 +529,8 @@ export const {
   clearProductError,
   clearSingleProduct,
   clearAIProducts,
-  clearAdminSingleProduct
+  clearAdminSingleProduct,
+  clearProducts
 } = productSlice.actions;
 
 export default productSlice.reducer;

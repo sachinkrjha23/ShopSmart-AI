@@ -10,7 +10,7 @@ import adminReducer from "./slices/adminSlice";
 import uiReducer from "./slices/uiSlice";
 import settingsReducer from "./slices/settingsSlice";
 import contactReducer from "./slices/contactSlice";
-
+import sellerReducer from "./slices/sellerSlice"
 
 
 const store = configureStore({
@@ -25,7 +25,8 @@ const store = configureStore({
     admin: adminReducer,
     ui: uiReducer,
     settings: settingsReducer,
-    contact: contactReducer
+    contact: contactReducer,
+    seller: sellerReducer,
   },
 });
 

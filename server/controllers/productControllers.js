@@ -116,7 +116,7 @@ export const createProduct = catchAsyncErrors(async (req, res, next) => {
 });
 
 export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
-  const { availability, price, category, ratings, search } = req.query;
+  const { availability, price, category, ratings, search, sellerId } = req.query;
   const page = parseInt(req.query.page) || 1;
   const limit = 10;
   const offset = (page - 1) * limit;
@@ -132,6 +132,16 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
   else if (availability === "limited")
     conditions.push(`stock > 0 AND stock <= 10`);
   else if (availability === "out-of-stock") conditions.push(`stock = 0`);
+
+  // Filter products by seller (public seller storefront view)
+  if (sellerId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sellerId)) {
+      return next(new ErrorHandler("Invalid seller ID.", 400));
+    }
+    conditions.push(`p.seller_id = $${index}`);
+    values.push(sellerId);
+    index++;
+  }
 
   // Filter products by price
   if (price) {
@@ -255,30 +265,31 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
   const result = await database.query(query, values);
 
   // QUERY FOR FETCHING NEW PRODUCTS
-  const newProductsQuery = `
-    SELECT p.*,
-    COUNT(r.id) AS review_count
-    FROM products p
-    LEFT JOIN reviews r ON p.id = r.product_id
-    WHERE p.created_at >= NOW() - INTERVAL '30 days' AND p.is_active = TRUE
-    GROUP BY p.id
-    ORDER BY p.created_at DESC
-    LIMIT 8
-  `;
-  const newProductsResult = await database.query(newProductsQuery);
+  const newProductsResult = sellerId
+    ? { rows: [] }
+    : await database.query(`
+        SELECT p.*,
+        COUNT(r.id) AS review_count
+        FROM products p
+        LEFT JOIN reviews r ON p.id = r.product_id
+        WHERE p.created_at >= NOW() - INTERVAL '30 days' AND p.is_active = TRUE
+        GROUP BY p.id
+        ORDER BY p.created_at DESC
+        LIMIT 8
+      `);
 
-  // QUERY FOR FETCHING TOP RATING PRODUCTS (rating >= 4.5)
-  const topRatedQuery = `
-    SELECT p.*,
-    COUNT(r.id) AS review_count
-    FROM products p
-    LEFT JOIN reviews r ON p.id = r.product_id
-    WHERE p.ratings >= 4.5 AND p.is_active = TRUE
-    GROUP BY p.id
-    ORDER BY p.ratings DESC, p.created_at DESC
-    LIMIT 8
-  `;
-  const topRatedResult = await database.query(topRatedQuery);
+  const topRatedResult = sellerId
+    ? { rows: [] }
+    : await database.query(`
+        SELECT p.*,
+        COUNT(r.id) AS review_count
+        FROM products p
+        LEFT JOIN reviews r ON p.id = r.product_id
+        WHERE p.ratings >= 4.5 AND p.is_active = TRUE
+        GROUP BY p.id
+        ORDER BY p.ratings DESC, p.created_at DESC
+        LIMIT 8
+      `);
 
   res.status(200).json({
     success: true,
@@ -465,7 +476,8 @@ export const fetchSingleProduct = catchAsyncErrors(async (req, res, next) => {
     `
       SELECT 
         p.*,
-        COALESCE(                 /*  COALESCE is a PostgreSQL function that returns the first non-NULL value from a list of arguments. */
+        s.store_name AS seller_store_name,
+        COALESCE(
           json_agg(
             json_build_object(
               'review_id', r.id,
@@ -482,8 +494,9 @@ export const fetchSingleProduct = catchAsyncErrors(async (req, res, next) => {
       FROM products p
       LEFT JOIN reviews r ON p.id = r.product_id
       LEFT JOIN users u ON r.user_id = u.id
+      LEFT JOIN sellers s ON s.id = p.seller_id
       WHERE p.id = $1 AND p.is_active = TRUE
-      GROUP BY p.id
+      GROUP BY p.id, s.store_name
     `,
     [productId],
   );

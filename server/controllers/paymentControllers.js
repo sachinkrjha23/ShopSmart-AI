@@ -52,16 +52,13 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
     }
 
     //  Shipping Info Resolution
-    // Either use a saved address (addressId) OR manual shippingInfo
     let resolvedShipping;
 
     if (addressId) {
-      // Security: validate UUID format before hitting DB
       if (!isValidUUID(addressId)) {
         throw new ErrorHandler("Invalid address ID.", 400);
       }
 
-      // Security: user_id check ensures user can't use someone else's address
       const savedAddress = await client.query(
         `SELECT * FROM user_addresses WHERE id = $1 AND user_id = $2`,
         [addressId, buyerId],
@@ -73,7 +70,6 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
 
       resolvedShipping = savedAddress.rows[0];
     } else {
-      // Manual shipping info
       if (!shippingInfo) {
         throw new ErrorHandler("Shipping information is required.", 400);
       }
@@ -119,7 +115,7 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
     //  Fetch Real Prices From DB
     const productIds = cartItems.map((item) => item.productId);
     const { rows: products } = await client.query(
-      `SELECT id, name, price, stock FROM products WHERE id = ANY($1::uuid[]) AND is_active = TRUE`,
+      `SELECT id, name, price, stock, seller_id FROM products WHERE id = ANY($1::uuid[]) AND is_active = TRUE`,
       [productIds],
     );
 
@@ -173,13 +169,10 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       throw new ErrorHandler("Invalid order amount.", 400);
     }
 
-    //  Coupon Validation — moved before tax so tax is charged on the
-    //  post-discount amount, not the original sticker price
     let discountAmount = 0;
     let appliedCouponId = null;
 
     if (coupon_code) {
-      // Security: sanitize input
       const sanitizedCode = coupon_code.trim().toUpperCase();
 
       if (sanitizedCode.length > 50) {
@@ -201,19 +194,34 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       if (!coupon.is_active) {
         throw new ErrorHandler("This coupon is no longer active.", 400);
       }
-
       if (now < new Date(coupon.valid_from)) {
         throw new ErrorHandler("This coupon is not active yet.", 400);
       }
-
       if (now > new Date(coupon.valid_until)) {
         throw new ErrorHandler("This coupon has expired.", 400);
       }
 
-      // Check against itemsPrice (before shipping) — fairer for users
-      if (itemsPrice < parseFloat(coupon.min_order_amount)) {
+      let eligibleAmount = itemsPrice;
+
+      if (coupon.seller_id) {
+        eligibleAmount = validatedItems.reduce((sum, item) => {
+          const product = products.find((p) => p.id === item.productId);
+          return product?.seller_id === coupon.seller_id
+            ? sum + Number(item.price) * item.quantity
+            : sum;
+        }, 0);
+
+        if (eligibleAmount === 0) {
+          throw new ErrorHandler(
+            "This coupon isn't valid for any items in your cart.",
+            400,
+          );
+        }
+      }
+
+      if (eligibleAmount < parseFloat(coupon.min_order_amount)) {
         throw new ErrorHandler(
-          `Minimum order amount of ₹${coupon.min_order_amount} required for this coupon.`,
+          `Minimum order amount of ₹${coupon.min_order_amount} required for this coupon${coupon.seller_id ? " (from that seller's products)" : ""}.`,
           400,
         );
       }
@@ -225,7 +233,6 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
         throw new ErrorHandler("This coupon has reached its usage limit.", 400);
       }
 
-      // Check per-user limit — inside transaction for accuracy
       const userUsage = await client.query(
         `SELECT COUNT(*) FROM coupon_usage WHERE coupon_id = $1 AND user_id = $2`,
         [coupon.id, buyerId],
@@ -238,21 +245,16 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
         );
       }
 
-      // Calculate discount
       if (coupon.type === "flat") {
         discountAmount = parseFloat(coupon.discount_value);
       } else {
-        discountAmount = (itemsPrice * parseFloat(coupon.discount_value)) / 100;
+        discountAmount = (eligibleAmount * parseFloat(coupon.discount_value)) / 100;
         if (coupon.max_discount !== null) {
-          discountAmount = Math.min(
-            discountAmount,
-            parseFloat(coupon.max_discount),
-          );
+          discountAmount = Math.min(discountAmount, parseFloat(coupon.max_discount));
         }
       }
 
-      // Discount can never exceed the value of the items themselves
-      discountAmount = Math.min(discountAmount, itemsPrice);
+      discountAmount = Math.min(discountAmount, eligibleAmount);
       discountAmount = Math.round(discountAmount * 100) / 100;
       appliedCouponId = coupon.id;
     }
@@ -260,8 +262,6 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
     const discountedItemsPrice =
       Math.round((itemsPrice - discountAmount) * 100) / 100;
 
-    //  Tax & Shipping — tax on the discounted price; free-shipping
-    //  threshold checked against the original cart value (see note above)
     const { rows: settingsRows } = await client.query(
       `SELECT shipping_fee, free_shipping_threshold, tax_rate FROM store_settings WHERE id = 1`,
     );
@@ -271,18 +271,20 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       tax_rate: 0,
     };
 
+    const taxRateFraction = parseFloat(settings.tax_rate) / 100;
     const taxPrice =
       Math.round(
-        discountedItemsPrice * (parseFloat(settings.tax_rate) / 100) * 100,
+        (discountedItemsPrice - discountedItemsPrice / (1 + taxRateFraction)) * 100,
       ) / 100;
     const shippingPrice =
       discountedItemsPrice > parseFloat(settings.free_shipping_threshold)
         ? 0
         : parseFloat(settings.shipping_fee);
-    const totalPrice =
-      Math.round((discountedItemsPrice + taxPrice + shippingPrice) * 100) / 100;
 
-    //  Amount Validation — on the real final amount, after discount/tax/shipping
+    //  Tax is already inside discountedItemsPrice — do NOT add it again.
+    const totalPrice =
+      Math.round((discountedItemsPrice + shippingPrice) * 100) / 100;
+
     if (totalPrice <= 0) {
       throw new ErrorHandler("Invalid order amount.", 400);
     }
@@ -293,25 +295,23 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       );
     }
 
-    //  Insert Order
     const {
       rows: [order],
     } = await client.query(
-      `INSERT INTO orders 
-       (buyer_id, total_price, tax_price, shipping_price, order_status, coupon_code, discount_amount)
-       VALUES ($1, $2, $3, $4, 'Processing', $5, $6)
-       RETURNING *`,
-      [
-        buyerId,
-        totalPrice,
-        taxPrice,
-        shippingPrice,
-        coupon_code ? coupon_code.trim().toUpperCase() : null,
-        discountAmount,
-      ],
+          `INSERT INTO orders 
+          (buyer_id, total_price, tax_price, shipping_price, order_status, coupon_code, discount_amount, pricing_mode)
+          VALUES ($1, $2, $3, $4, 'Processing', $5, $6, 'inclusive')
+          RETURNING *`,
+          [
+            buyerId,
+            totalPrice,
+            taxPrice,
+            shippingPrice,
+            coupon_code ? coupon_code.trim().toUpperCase() : null,
+            discountAmount,
+          ],
     );
 
-    //  Insert Order Items
     for (const item of validatedItems) {
       await client.query(
         `INSERT INTO order_items (order_id, product_id, quantity, price, image, title)
@@ -327,7 +327,6 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       );
     }
 
-    //  Insert Shipping Info
     await client.query(
       `INSERT INTO shipping_info (order_id, full_name, state, city, country, address, pincode, phone)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -343,7 +342,6 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       ],
     );
 
-    //  Create Razorpay Order
     const razorpayOrder = await razorpay.orders.create({
       amount: toPaise(totalPrice),
       currency: "INR",
@@ -354,7 +352,6 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       },
     });
 
-    //  Insert Payment Record
     await client.query(
       `INSERT INTO payments (order_id, payment_type, payment_status, razorpay_order_id)
        VALUES ($1, 'Online', 'Pending', $2)`,
@@ -363,12 +360,11 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
 
     await client.query("COMMIT");
 
-    //  Response
     res.status(201).json({
       success: true,
       orderId: order.id,
       razorpayOrderId: razorpayOrder.id,
-      amount: razorpayOrder.amount, // raw paise — required by Razorpay's checkout widget
+      amount: razorpayOrder.amount,
       displayAmount: `₹${(razorpayOrder.amount / 100).toLocaleString("en-IN")}`,
       currency: "INR",
       keyId: process.env.RAZORPAY_FRONTEND_KEY,
@@ -415,8 +411,6 @@ export const verifyPayment = catchAsyncErrors(async (req, res, next) => {
       throw new ErrorHandler("Invalid order ID.", 400);
     }
 
-    // Security: confirm this order belongs to the requesting user before
-    // touching payment/order rows tied to it.
     const orderOwnerCheck = await client.query(
       `SELECT id FROM orders WHERE id = $1 AND buyer_id = $2`,
       [orderId, req.user.id],
@@ -426,7 +420,6 @@ export const verifyPayment = catchAsyncErrors(async (req, res, next) => {
       throw new ErrorHandler("Order not found.", 404);
     }
 
-    // Verify HMAC signature
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
     const expected = crypto
       .createHmac("sha256", process.env.RAZORPAY_SECRET_KEY)
@@ -440,7 +433,6 @@ export const verifyPayment = catchAsyncErrors(async (req, res, next) => {
       );
     }
 
-    // Update payment record
     await client.query(
       `UPDATE payments
        SET razorpay_payment_id = $1,
@@ -484,7 +476,7 @@ export const verifyPayment = catchAsyncErrors(async (req, res, next) => {
   }
 });
 
-// 3. WEBHOOK — called by Razorpay servers directly
+// 3. WEBHOOK
 export const handleWebhook = async (req, res) => {
   const client = await database.connect();
   let transactionStarted = false;
@@ -649,7 +641,8 @@ export const getMyOrders = catchAsyncErrors(async (req, res, next) => {
           'title',     oi.title,
           'image',     oi.image,
           'quantity',  oi.quantity,
-          'price',     oi.price
+          'price',     oi.price,
+          'fulfillmentStatus', oi.fulfillment_status
         )
       ) AS items
      FROM orders o
@@ -680,7 +673,7 @@ export const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
 
   const { rows } = await database.query(
     `SELECT
-      o.id, o.total_price, o.tax_price, o.shipping_price,
+      o.id, o.total_price, o.tax_price, o.shipping_price, o.pricing_mode,
       o.order_status, o.coupon_code, o.discount_amount, o.paid_at, o.created_at,       
       p.payment_status, p.razorpay_payment_id, p.payment_method,
       s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
@@ -690,7 +683,8 @@ export const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
           'title',     oi.title,
           'image',     oi.image,
           'quantity',  oi.quantity,
-          'price',     oi.price
+          'price',     oi.price,
+          'fulfillmentStatus', oi.fulfillment_status
         )
       ) AS items
      FROM orders o
@@ -754,28 +748,46 @@ export const cancelOrder = catchAsyncErrors(async (req, res, next) => {
       [orderId],
     );
 
+    //  Skip restocking/refunding items a seller already cancelled — those
+    //  were already restocked and (partially) refunded via
+    //  cancelOrderItemBySeller. Only the still-active portion of the order
+    //  should be restocked/refunded here.
+    let remainingRefund = Number(order.total_price);
+
     if (order.payment_status === "Paid") {
       const { rows: items } = await client.query(
-        `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
+        `SELECT product_id, quantity, fulfillment_status, refund_amount
+         FROM order_items WHERE order_id = $1`,
         [orderId],
       );
 
+      let alreadyRefunded = 0;
+
       for (const item of items) {
+        if (item.fulfillment_status === "Cancelled") {
+          alreadyRefunded += Number(item.refund_amount) || 0;
+          continue;
+        }
         await client.query(
           `UPDATE products SET stock = stock + $1 WHERE id = $2`,
           [item.quantity, item.product_id],
         );
       }
+
+      remainingRefund =
+        Math.round((Number(order.total_price) - alreadyRefunded) * 100) / 100;
     }
 
     let refundInitiated = false;
     if (
       order.payment_status === "Paid" &&
       order.razorpay_payment_id &&
-      !order.razorpay_payment_id.startsWith("pay_test")
+      !order.razorpay_payment_id.startsWith("pay_test") &&
+      remainingRefund > 0
     ) {
       try {
         await razorpay.payments.refund(order.razorpay_payment_id, {
+          amount: toPaise(remainingRefund),
           notes: { orderId, reason: "Order cancelled by user" },
         });
 
@@ -902,7 +914,8 @@ export const adminGetSingleOrder = catchAsyncErrors(async (req, res, next) => {
           'title',     oi.title,
           'image',     oi.image,
           'quantity',  oi.quantity,
-          'price',     oi.price
+          'price',     oi.price,
+          'fulfillmentStatus', oi.fulfillment_status
         )
       ) AS items
      FROM orders o
@@ -956,6 +969,22 @@ export const adminUpdateOrderStatus = catchAsyncErrors(
     }
 
     const currentStatus = existingRows[0].order_status;
+
+    const sellerItemsCheck = await database.query(
+      `SELECT COUNT(*) FROM order_items oi
+      JOIN products p ON p.id = oi.product_id
+      WHERE oi.order_id = $1 AND p.seller_id IS NOT NULL`,
+      [orderId],
+    );
+
+    if (parseInt(sellerItemsCheck.rows[0].count) > 0) {
+      return next(
+        new ErrorHandler(
+          "This order contains items from a marketplace seller. Their fulfillment status must be managed by the seller, not the admin panel.",
+          403,
+        ),
+      );
+    }
 
     if (currentStatus === "Delivered" || currentStatus === "Cancelled") {
       return next(
@@ -1113,6 +1142,20 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
 
     const order = rows[0];
 
+    const sellerItemsCheck = await client.query(
+      `SELECT COUNT(*) FROM order_items oi
+      JOIN products p ON p.id = oi.product_id
+      WHERE oi.order_id = $1 AND p.seller_id IS NOT NULL`,
+      [orderId],
+    );
+
+    if (parseInt(sellerItemsCheck.rows[0].count) > 0) {
+      throw new ErrorHandler(
+        "This order contains items from a marketplace seller and cannot be cancelled from the admin panel.",
+        403,
+      );
+    }
+
     if (order.order_status === "Delivered") {
       throw new ErrorHandler("Delivered orders cannot be cancelled.", 400);
     }
@@ -1206,10 +1249,12 @@ export const getOrderInvoice = catchAsyncErrors(async (req, res, next) => {
         s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
         json_agg(
           json_build_object(
-            'title', oi.title,
-            'quantity', oi.quantity,
-            'price', oi.price,
-            'image', oi.image
+            'productId', oi.product_id,
+            'title',     oi.title,
+            'image',     oi.image,
+            'quantity',  oi.quantity,
+            'price',     oi.price,
+            'fulfillmentStatus', oi.fulfillment_status
           )
         ) AS items
        FROM orders o

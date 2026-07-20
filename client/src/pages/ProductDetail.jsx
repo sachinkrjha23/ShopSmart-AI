@@ -11,7 +11,6 @@ import useCart from "../hooks/useCart";
 import WishlistButton from "../components/wishlist/WishlistButton";
 import ImageCarousel from "../components/ui/ImageCarousel";
 import ReviewForm from "../components/product/ReviewForm";
-
 const ProductDetail = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -146,6 +145,18 @@ const ProductDetail = () => {
               <p className="text-sm text-gray-600 leading-relaxed">
                 {product.description}
               </p>
+
+              {product.seller_id && product.seller_store_name && (
+                <p className="text-sm text-gray-500">
+                  Sold by{' '}
+                  <Link
+                    to={`/sellers/${product.seller_id}`}
+                    className="text-indigo-600 hover:underline font-medium"
+                  >
+                    {product.seller_store_name}
+                  </Link>
+                </p>
+              )}
 
               <hr className="border-gray-100" />
 

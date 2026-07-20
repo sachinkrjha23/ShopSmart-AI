@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { to: '/admin/products', label: 'Products' },
   { to: '/admin/orders', label: 'Orders' },
   { to: '/admin/users', label: 'Users' },
+  { to: '/admin/sellers', label: 'Sellers' },
   { to: '/admin/reviews', label: 'Reviews' },
   { to: '/admin/coupons', label: 'Coupons' },
   { to: '/admin/messages', label: 'Messages' },

@@ -56,11 +56,28 @@ import { useSelector } from "react-redux";
 import Messages from "./pages/admin/Messages";
 import ScrollToTop from "./components/layout/ScrollToTop";
 
+// Seller
+import SellerRoute from "./routes/SellerRoute";
+import BecomeSeller from "./pages/BecomeSeller";
+import SellerDashboard from "./pages/seller/SellerDashboard";
+import SellerProducts from "./pages/seller/SellerProducts";
+import SellerOrders from "./pages/seller/SellerOrders";
+import SellerOrderDetail from "./pages/seller/SellerOrderDetail";
+import SellerAddProduct from "./pages/seller/AddProduct";
+import SellerEditProduct from "./pages/seller/EditProduct";
+import SellerProfile from "./pages/SellerProfile";
+import SellerCoupons from "./pages/seller/Coupons";
+
+// Seller - Admin
+import AdminSellers from "./pages/admin/Sellers";
+import AdminSellerDetail from "./pages/admin/SellerDetail";
+import { fetchMySellerProfile } from "./store/slices/sellerSlice";
+
 const App = () => {
   const dispatch = useDispatch();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
-  const { isAuthenticated, sessionChecked } = useSelector(
+  const isSellerRoute = location.pathname === "/seller" || location.pathname.startsWith("/seller/");  const { isAuthenticated, sessionChecked } = useSelector(
     (state) => state.auth,
   );
 
@@ -74,11 +91,17 @@ const App = () => {
     }
   }, [sessionChecked, isAuthenticated, dispatch]);
 
+  useEffect(() => {
+    if (sessionChecked && isAuthenticated) {
+      dispatch(fetchMySellerProfile());
+    }
+  }, [sessionChecked, isAuthenticated, dispatch]);
+
   return (
     <>
       <Toaster position="top-right" />
       <ScrollToTop />
-      {!isAdminRoute && (
+      {!isAdminRoute && !isSellerRoute && (
         <>
           <Navbar />
           <LoginModal />
@@ -117,214 +140,58 @@ const App = () => {
         {/* ****************************************************************** */}
 
         {/* Public Only Routes (redirect if logged in) */}
-        <Route
-          path="/forgot-password"
-          element={
-            <PublicRoute>
-              <ForgotPassword />
-            </PublicRoute>
-          }
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPassword/></        PublicRoute>}
         />
 
-        <Route
-          path="/reset-password/:token"
-          element={
-            <PublicRoute>
-              <ResetPassword />
-            </PublicRoute>
-          }
+        <Route path="/reset-password/:token" element={<PublicRoute><ResetPassword /></PublicRoute>}
         />
 
         {/* ************************************************************************************* */}
 
         {/* Private Routes (redirect if not logged in) */}
-        <Route
-          path="/checkout"
-          element={
-            <PrivateRoute>
-              <Checkout />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/payment-success"
-          element={
-            <PrivateRoute>
-              <PaymentSuccess />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/payment-failed"
-          element={
-            <PrivateRoute>
-              <PaymentFailed />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/orders"
-          element={
-            <PrivateRoute>
-              <Orders />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/orders/:id"
-          element={
-            <PrivateRoute>
-              <OrderDetail />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/wishlist"
-          element={
-            <PrivateRoute>
-              <Wishlist />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/profile"
-          element={
-            <PrivateRoute>
-              <Profile />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/addresses"
-          element={
-            <PrivateRoute>
-              <Addresses />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/update-password"
-          element={
-            <PrivateRoute>
-              <UpdatePassword />
-            </PrivateRoute>
-          }
-        />
-
-        {/* **************************************************************************************** */}
+        <Route path="/checkout" element={<PrivateRoute><Checkout /></PrivateRoute>} />
+        <Route path="/payment-success" element={<PrivateRoute><PaymentSuccess /></PrivateRoute>} />
+        <Route path="/payment-failed" element={<PrivateRoute><PaymentFailed /></PrivateRoute>} />
+        <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
+        <Route path="/orders/:id" element={<PrivateRoute><OrderDetail /></PrivateRoute>} />
+        <Route path="/wishlist" element={<PrivateRoute><Wishlist /></PrivateRoute>} />
+        <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+        <Route path="/addresses" element={<PrivateRoute><Addresses /></PrivateRoute>} />
+        <Route path="/update-password" element={<PrivateRoute><UpdatePassword /></PrivateRoute>} />
 
         {/* Admin Routes */}
-        <Route
-          path="/admin"
-          element={
-            <AdminRoute>
-              <Dashboard />
-            </AdminRoute>
-          }
-        />
+        <Route path="/admin" element={<AdminRoute><Dashboard /></AdminRoute>} />
+        <Route path="/admin/products" element={<AdminRoute><AdminProducts /></AdminRoute>} />
+        <Route path="/admin/products/add" element={<AdminRoute><AddProduct /></AdminRoute>} />
+        <Route path="/admin/products/edit/:id" element={<AdminRoute><EditProduct /></AdminRoute>} />
+        <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
+        <Route path="/admin/orders/:id" element={<AdminRoute><AdminOrderDetail /></AdminRoute>} />
+        <Route path="/admin/users" element={<AdminRoute><Users /></AdminRoute>} />
+        <Route path="/admin/reviews" element={<AdminRoute><Reviews /></AdminRoute>} />
+        <Route path="/admin/coupons" element={<AdminRoute><Coupons /></AdminRoute>} />
+        <Route path="/admin/messages" element={<AdminRoute><Messages /></AdminRoute>} />
+        <Route path="/admin/settings" element={<AdminRoute><Settings /></AdminRoute>} />
 
-        <Route
-          path="/admin/products"
-          element={
-            <AdminRoute>
-              <AdminProducts />
-            </AdminRoute>
-          }
-        />
+        {/* Seller */}
+        <Route path="/become-seller" element={<PrivateRoute><BecomeSeller /></PrivateRoute>} />
+        <Route path="/seller" element={<SellerRoute><SellerDashboard /></SellerRoute>} />
+        <Route path="/seller/products" element={<SellerRoute><SellerProducts /></SellerRoute>} />
+        <Route path="/seller/orders" element={<SellerRoute><SellerOrders /></SellerRoute>} />
+        <Route path="/seller/orders/:id" element={<SellerRoute><SellerOrderDetail /></SellerRoute>} />
+        <Route path="/seller/products/add" element={<SellerRoute><SellerAddProduct /></SellerRoute>} />
+        <Route path="/seller/products/edit/:id" element={<SellerRoute><SellerEditProduct /></SellerRoute>} />
+        <Route path="/seller/coupons" element={<SellerRoute><SellerCoupons /></SellerRoute>} />
 
-        <Route
-          path="/admin/products/add"
-          element={
-            <AdminRoute>
-              <AddProduct />
-            </AdminRoute>
-          }
-        />
+        {/* Seller - Admin */}
+        <Route path="/admin/sellers" element={<AdminRoute><AdminSellers /></AdminRoute>} />
+        <Route path="/admin/sellers/:id" element={<AdminRoute><AdminSellerDetail /></AdminRoute>} />
 
-        <Route
-          path="/admin/products/edit/:id"
-          element={
-            <AdminRoute>
-              <EditProduct />
-            </AdminRoute>
-          }
-        />
-
-        <Route
-          path="/admin/orders"
-          element={
-            <AdminRoute>
-              <AdminOrders />
-            </AdminRoute>
-          }
-        />
-
-        <Route
-          path="/admin/orders/:id"
-          element={
-            <AdminRoute>
-              <AdminOrderDetail />
-            </AdminRoute>
-          }
-        />
-
-        <Route
-          path="/admin/users"
-          element={
-            <AdminRoute>
-              <Users />
-            </AdminRoute>
-          }
-        />
-
-        <Route
-          path="/admin/reviews"
-          element={
-            <AdminRoute>
-              <Reviews />
-            </AdminRoute>
-          }
-        />
-
-        <Route
-          path="/admin/coupons"
-          element={
-            <AdminRoute>
-              <Coupons />
-            </AdminRoute>
-          }
-        />
-
-        <Route
-          path="/admin/messages"
-          element={
-            <AdminRoute>
-              <Messages />
-            </AdminRoute>
-          }
-        />
-
-        <Route
-          path="/admin/settings"
-          element={
-            <AdminRoute>
-              <Settings />
-            </AdminRoute>
-          }
-        />
-
+        <Route path="/sellers/:sellerId" element={<SellerProfile />} />
+        
         {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
-      {!isAdminRoute && <Footer />}
+      {!isAdminRoute && !isSellerRoute && <Footer />}
     </>
   );
 };

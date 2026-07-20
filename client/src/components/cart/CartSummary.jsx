@@ -26,12 +26,10 @@ const CartSummary = () => {
 
   const shippingFee = settings ? Number(settings.shipping_fee) : 50
   const freeShippingThreshold = settings ? Number(settings.free_shipping_threshold) : 500
-  const taxRate = settings ? Number(settings.tax_rate) : 0
 
   const priceAfterDiscount = totalPrice - discount
-  const shipping = priceAfterDiscount > freeShippingThreshold ? 0 : shippingFee  
-  const tax = Math.round(priceAfterDiscount * (taxRate / 100) * 100) / 100
-  const estimatedTotal = priceAfterDiscount + shipping + tax
+  const shipping = priceAfterDiscount > freeShippingThreshold ? 0 : shippingFee
+  const estimatedTotal = priceAfterDiscount + shipping
 
   const isEmpty = totalQuantity === 0
 
@@ -50,13 +48,6 @@ const CartSummary = () => {
         <div className="flex justify-between text-sm text-green-600 mb-2">
           <span>Coupon ({coupon.code})</span>
           <span>-{formatPrice(discount)}</span>
-        </div>
-      )}
-
-      {tax > 0 && (
-        <div className="flex justify-between text-sm text-gray-600 mb-2">
-          <span>Tax ({taxRate}%)</span>
-          <span>{formatPrice(tax)}</span>
         </div>
       )}
 

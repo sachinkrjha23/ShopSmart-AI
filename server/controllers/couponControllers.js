@@ -7,15 +7,19 @@ const isValidUUID = (id) =>
 
 //  Validate Coupon (User)
 export const validateCoupon = catchAsyncErrors(async (req, res, next) => {
-  const { code, cartTotal } = req.body;
+  const { code, cartItems } = req.body;
 
-  if (!code || !cartTotal) {
+  if (
+    !code ||
+    !cartItems ||
+    !Array.isArray(cartItems) ||
+    cartItems.length === 0
+  ) {
     return next(
-      new ErrorHandler("Coupon code and cart total are required.", 400),
+      new ErrorHandler("Coupon code and cart items are required.", 400),
     );
   }
 
-  // 1. Find coupon (case-insensitive)
   const result = await database.query(
     `SELECT * FROM coupons WHERE UPPER(code) = UPPER($1)`,
     [code.trim()],
@@ -27,12 +31,10 @@ export const validateCoupon = catchAsyncErrors(async (req, res, next) => {
 
   const coupon = result.rows[0];
 
-  // 2. Check if active
   if (!coupon.is_active) {
     return next(new ErrorHandler("This coupon is no longer active.", 400));
   }
 
-  // 3. Check validity dates
   const now = new Date();
   if (now < new Date(coupon.valid_from)) {
     return next(new ErrorHandler("This coupon is not active yet.", 400));
@@ -41,27 +43,55 @@ export const validateCoupon = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("This coupon has expired.", 400));
   }
 
-  // 4. Check min order amount
-  if (parseFloat(cartTotal) < parseFloat(coupon.min_order_amount)) {
+  const productIds = cartItems.map((item) => item.productId);
+  const { rows: products } = await database.query(
+    `SELECT id, price, seller_id FROM products WHERE id = ANY($1::uuid[]) AND is_active = TRUE`,
+    [productIds],
+  );
+
+  let cartTotal = 0;
+  let eligibleAmount = 0;
+
+  for (const item of cartItems) {
+    const product = products.find((p) => p.id === item.productId);
+    if (!product) continue;
+    const lineTotal = Number(product.price) * item.quantity;
+    cartTotal += lineTotal;
+    if (!coupon.seller_id || product.seller_id === coupon.seller_id) {
+      eligibleAmount += lineTotal;
+    }
+  }
+
+  if (cartTotal <= 0) {
+    return next(new ErrorHandler("Invalid cart.", 400));
+  }
+
+  if (coupon.seller_id && eligibleAmount === 0) {
     return next(
       new ErrorHandler(
-        `Minimum order amount of ₹${coupon.min_order_amount} required for this coupon.`,
+        "This coupon isn't valid for any items in your cart.",
         400,
       ),
     );
   }
 
-  // 5. Check global usage limit
+  if (eligibleAmount < parseFloat(coupon.min_order_amount)) {
+    return next(
+      new ErrorHandler(
+        `Minimum order amount of ₹${coupon.min_order_amount} required for this coupon${coupon.seller_id ? " (from that seller's products)" : ""}.`,
+        400,
+      ),
+    );
+  }
+
   if (coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit) {
     return next(
       new ErrorHandler("This coupon has reached its usage limit.", 400),
     );
   }
 
-  // 6. Check per-user usage limit
   const userUsage = await database.query(
-    `SELECT COUNT(*) FROM coupon_usage 
-         WHERE coupon_id = $1 AND user_id = $2`,
+    `SELECT COUNT(*) FROM coupon_usage WHERE coupon_id = $1 AND user_id = $2`,
     [coupon.id, req.user.id],
   );
 
@@ -74,15 +104,11 @@ export const validateCoupon = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
-  // 7. Calculate discount
   let discountAmount = 0;
-
   if (coupon.type === "flat") {
     discountAmount = parseFloat(coupon.discount_value);
   } else if (coupon.type === "percentage") {
-    discountAmount =
-      (parseFloat(cartTotal) * parseFloat(coupon.discount_value)) / 100;
-    // Cap at max_discount if set
+    discountAmount = (eligibleAmount * parseFloat(coupon.discount_value)) / 100;
     if (coupon.max_discount !== null) {
       discountAmount = Math.min(
         discountAmount,
@@ -91,9 +117,8 @@ export const validateCoupon = catchAsyncErrors(async (req, res, next) => {
     }
   }
 
-  // 8. Discount cannot exceed cart total
-  discountAmount = Math.min(discountAmount, parseFloat(cartTotal));
-  const finalAmount = parseFloat(cartTotal) - discountAmount;
+  discountAmount = Math.min(discountAmount, eligibleAmount);
+  const finalAmount = cartTotal - discountAmount;
 
   res.status(200).json({
     success: true,
@@ -102,9 +127,11 @@ export const validateCoupon = catchAsyncErrors(async (req, res, next) => {
       code: coupon.code,
       type: coupon.type,
       discountValue: coupon.discount_value,
+      sellerScoped: !!coupon.seller_id,
     },
     discountAmount: discountAmount.toFixed(2),
-    cartTotal: parseFloat(cartTotal).toFixed(2),
+    cartTotal: cartTotal.toFixed(2),
+    eligibleAmount: eligibleAmount.toFixed(2),
     finalAmount: finalAmount.toFixed(2),
   });
 });

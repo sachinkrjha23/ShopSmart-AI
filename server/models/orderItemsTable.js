@@ -18,6 +18,16 @@ export async function createOrderItemTable() {
     `;
 
     await database.query(query);
+    await database.query(
+      `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS fulfillment_status TEXT NOT NULL DEFAULT 'Pending'
+      CHECK (fulfillment_status IN ('Pending', 'Shipped', 'Delivered'));`,
+    );
+    await database.query(
+      `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancellation_reason TEXT DEFAULT NULL;`,
+    );
+    await database.query(
+      `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS refund_amount DECIMAL(10,2) DEFAULT NULL;`,
+    );
   } catch (error) {
     console.error("❌ Failed To Create Order Items Table.", error);
     process.exit(1);

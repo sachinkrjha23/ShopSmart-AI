@@ -1,19 +1,28 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
-import { applyCoupon, removeCoupon, clearPendingCode } from "../../store/slices/couponSlice";
+import {
+  applyCoupon,
+  removeCoupon,
+  clearPendingCode,
+} from "../../store/slices/couponSlice";
 
 const CouponInput = () => {
   const dispatch = useDispatch();
   const [code, setCode] = useState("");
-  const { totalPrice } = useSelector((state) => state.cart);
-  const { coupon, discount, loading, error, appliedForTotal, pendingCode } = useSelector(
-    (state) => state.coupon,
-  );
+  const { totalPrice, items } = useSelector((state) => state.cart);
+  const { coupon, discount, loading, error, appliedForTotal, pendingCode } =
+    useSelector((state) => state.coupon);
+
+  const buildCartItems = () =>
+    items.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    }));
 
   useEffect(() => {
     if (pendingCode && !coupon && totalPrice > 0) {
-      dispatch(applyCoupon({ code: pendingCode, cartTotal: totalPrice }))
+      dispatch(applyCoupon({ code: pendingCode, cartItems: buildCartItems() }))
         .unwrap()
         .catch(() => {})
         .finally(() => dispatch(clearPendingCode()));
@@ -30,7 +39,7 @@ const CouponInput = () => {
   const handleApply = (e) => {
     e.preventDefault();
     if (!code.trim()) return toast.error("Please enter a coupon code");
-    dispatch(applyCoupon({ code: code.trim(), cartTotal: totalPrice }));
+    dispatch(applyCoupon({ code: code.trim(), cartItems: buildCartItems() }));
   };
 
   const handleRemove = () => {

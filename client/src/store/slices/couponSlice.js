@@ -11,9 +11,9 @@ import { login, fetchMe, googleLogin, googleSignup, logout } from "./authSlice";
 
 export const applyCoupon = createAsyncThunk(
   "coupon/applyCoupon",
-  async ({ code, cartTotal }, { rejectWithValue }) => {
+  async ({ code, cartItems }, { rejectWithValue }) => {
     try {
-      const res = await applyCouponCode({ code, cartTotal });
+      const res = await applyCouponCode({ code, cartItems });
       return res.data;
     } catch (err) {
       return rejectWithValue(

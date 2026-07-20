@@ -32,5 +32,10 @@ export const createCouponTables = async () => {
         );
     `);
 
+    await database.query(`
+        ALTER TABLE coupons ADD COLUMN IF NOT EXISTS seller_id UUID DEFAULT NULL 
+        REFERENCES sellers(id) ON DELETE CASCADE;
+    `);
+
     console.log("✅ Coupon tables ready");
 };
