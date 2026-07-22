@@ -10,6 +10,7 @@ import {
 } from "../../store/slices/uiSlice";
 import { toast } from "react-hot-toast";
 import logo from "../../assets/images/logo.png";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = () => {
   const dispatch = useDispatch();
@@ -99,87 +100,90 @@ const Navbar = () => {
 
               {/* Auth / Profile */}
               {isAuthenticated ? (
-                <div className="relative">
-                  <button
-                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    className="flex items-center gap-2 focus:outline-none"
-                  >
-                    {user?.avatar?.url ? (
-                      <img
-                        src={user.avatar.url}
-                        alt={user.name}
-                        className="h-8 w-8 rounded-full object-cover ring-2 ring-white shadow-sm"
-                      />
-                    ) : (
-                      <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-medium ring-2 ring-white shadow-sm">
-                        {user?.name?.charAt(0).toUpperCase()}
+                <>
+                  <NotificationBell />
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsProfileOpen(!isProfileOpen)}
+                      className="flex items-center gap-2 focus:outline-none"
+                    >
+                      {user?.avatar?.url ? (
+                        <img
+                          src={user.avatar.url}
+                          alt={user.name}
+                          className="h-8 w-8 rounded-full object-cover ring-2 ring-white shadow-sm"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-medium ring-2 ring-white shadow-sm">
+                          {user?.name?.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </button>
+
+                    {isProfileOpen && (
+                      <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 overflow-hidden">
+                        <div className="px-4 py-3 border-b border-gray-100">
+                          <p className="text-sm font-medium text-gray-800">
+                            {user?.name}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                        </div>
+                        {user?.role === "Admin" && (
+                          <Link
+                            to="/admin"
+                            onClick={() => setIsProfileOpen(false)}
+                            className="block px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
+                          >
+                            Admin Dashboard
+                          </Link>
+                        )}
+                        {mySeller?.status === "Approved" && (
+                          <Link
+                            to="/seller"
+                            onClick={() => setIsProfileOpen(false)}
+                            className="block px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
+                          >
+                            Seller Dashboard
+                          </Link>
+                        )}
+                        <Link
+                          to="/profile"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          Profile
+                        </Link>
+                        <Link
+                          to="/orders"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          My Orders
+                        </Link>
+                        <Link
+                          to="/wishlist"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          Wishlist
+                        </Link>
+                        <Link
+                          to="/addresses"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          Addresses
+                        </Link>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100 mt-1 pt-2"
+                        >
+                          Logout
+                        </button>
                       </div>
                     )}
-                  </button>
-
-                  {isProfileOpen && (
-                    <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-sm font-medium text-gray-800">
-                          {user?.name}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                      </div>
-                      {user?.role === "Admin" && (
-                        <Link
-                          to="/admin"
-                          onClick={() => setIsProfileOpen(false)}
-                          className="block px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
-                        >
-                          Admin Dashboard
-                        </Link>
-                      )}
-                      {mySeller?.status === "Approved" && (
-                        <Link
-                          to="/seller"
-                          onClick={() => setIsProfileOpen(false)}
-                          className="block px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
-                        >
-                          Seller Dashboard
-                        </Link>
-                      )}
-                      <Link
-                        to="/profile"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        Profile
-                      </Link>
-                      <Link
-                        to="/orders"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        My Orders
-                      </Link>
-                      <Link
-                        to="/wishlist"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        Wishlist
-                      </Link>
-                      <Link
-                        to="/addresses"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        Addresses
-                      </Link>
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-100 mt-1 pt-2"
-                      >
-                        Logout
-                      </button>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                </>
               ) : (
                 <div className="flex items-center gap-3">
                   <button

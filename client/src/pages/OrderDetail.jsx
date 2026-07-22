@@ -99,6 +99,7 @@ const OrderDetail = () => {
   const items = (order.items || []).filter(Boolean);
   const paymentTag = PAYMENT_TAGS[order.payment_status];
   const canCancel = order.order_status === "Processing";
+  const hasSellerItems = items.some((item) => item.sellerId);
   const itemsSubtotal = items.reduce(
     (sum, item) => sum + Number(item.price) * item.quantity,
     0,
@@ -156,6 +157,12 @@ const OrderDetail = () => {
         </div>
 
         <OrderTimeline status={order.order_status} />
+
+        {hasSellerItems && (
+          <p className="text-xs text-gray-400 mt-3">
+            This order includes items from a marketplace seller — their delivery progress is tracked individually below, and may not match the overall status shown above.
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">

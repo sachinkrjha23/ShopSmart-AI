@@ -1,6 +1,7 @@
 import app from "./app.js";
 import {v2 as cloudinary} from "cloudinary";
 import { autoCancelStaleOrders } from "./utils/autoCancelStaleOrders.js";
+import { autoExpireNotifications } from "./utils/autoExpireNotifications.js";
 
 
 cloudinary.config({
@@ -24,3 +25,4 @@ server.on('error', (error) => {
 });
 
 setInterval(autoCancelStaleOrders, 5 * 60 * 1000);
+setInterval(autoExpireNotifications, 60 * 60 * 1000); 

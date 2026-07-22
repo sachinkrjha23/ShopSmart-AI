@@ -4,6 +4,7 @@ import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { v2 as cloudinary } from "cloudinary";
 import Razorpay from "razorpay";
+import { createPersonalNotification } from "./notificationControllers.js";
 
 const REAPPLY_COOLDOWN_DAYS = 10;
 const SUSPENSION_COOLDOWN_DAYS = 30;
@@ -308,6 +309,13 @@ export const adminApproveSeller = catchAsyncErrors(async (req, res, next) => {
     }
   }
 
+  await createPersonalNotification({
+    userId: seller.user_id,
+    type: "seller_approved",
+    title: "Seller application approved",
+    message: `Your seller application for "${seller.store_name}" has been approved. You can now start listing products.`,
+  });
+
   res.status(200).json({
     success: true,
     message: "Seller approved successfully.",
@@ -361,6 +369,13 @@ export const adminRejectSeller = catchAsyncErrors(async (req, res, next) => {
       console.error("Failed to send seller rejection email:", error.message);
     }
   }
+
+  await createPersonalNotification({
+    userId: seller.user_id,
+    type: "seller_rejected",
+    title: "Seller application update",
+    message: `Your seller application for "${seller.store_name}" was not approved. Reason: ${reason.trim()}`,
+  });
 
   res.status(200).json({
     success: true,
@@ -416,6 +431,13 @@ export const adminSuspendSeller = catchAsyncErrors(async (req, res, next) => {
       console.error("Failed to send seller suspension email:", error.message);
     }
   }
+
+  await createPersonalNotification({
+    userId: seller.user_id,
+    type: "seller_suspended",
+    title: "Seller account suspended",
+    message: `Your seller account "${seller.store_name}" has been suspended. Reason: ${reason.trim()}`,
+  });
 
   res.status(200).json({
     success: true,
@@ -1100,7 +1122,7 @@ export const updateFulfillmentStatus = catchAsyncErrors(async (req, res, next) =
   }
 
   const itemResult = await database.query(
-    `SELECT oi.id, oi.fulfillment_status
+    `SELECT oi.id, oi.fulfillment_status, oi.order_id, o.buyer_id, p.name AS product_name
      FROM order_items oi
      JOIN products p ON p.id = oi.product_id
      JOIN orders o ON o.id = oi.order_id
@@ -1112,7 +1134,7 @@ export const updateFulfillmentStatus = catchAsyncErrors(async (req, res, next) =
     return next(new ErrorHandler("Order item not found.", 404));
   }
 
-  const currentStatus = itemResult.rows[0].fulfillment_status;
+  const { fulfillment_status: currentStatus, order_id, buyer_id, product_name } = itemResult.rows[0];
 
   if (currentStatus === "Delivered") {
     return next(new ErrorHandler("This item is already Delivered and cannot be changed further.", 400));
@@ -1128,6 +1150,19 @@ export const updateFulfillmentStatus = catchAsyncErrors(async (req, res, next) =
     `UPDATE order_items SET fulfillment_status = $1 WHERE id = $2 RETURNING *`,
     [status, itemId],
   );
+
+  if (status === "Shipped" || status === "Delivered") {
+    await createPersonalNotification({
+      userId: buyer_id,
+      type: status === "Shipped" ? "item_shipped" : "item_delivered",
+      title: status === "Shipped" ? "An item has shipped" : "An item was delivered",
+      message: status === "Shipped"
+        ? `"${product_name}" from order #${order_id.slice(0, 8).toUpperCase()} is on its way.`
+        : `"${product_name}" from order #${order_id.slice(0, 8).toUpperCase()} has been delivered.`,
+      linkEntityType: "order",
+      linkEntityId: order_id,
+    });
+  }
 
   res.status(200).json({
     success: true,
@@ -1158,7 +1193,7 @@ export const cancelOrderItemBySeller = catchAsyncErrors(async (req, res, next) =
     const itemResult = await client.query(
       `SELECT oi.id, oi.product_id, oi.quantity, oi.price, oi.fulfillment_status, oi.order_id,
               pay.payment_status, pay.razorpay_payment_id,
-              u.name AS buyer_name, u.email AS buyer_email
+              u.name AS buyer_name, u.email AS buyer_email, o.buyer_id, p.name AS product_name
        FROM order_items oi
        JOIN products p ON p.id = oi.product_id
        JOIN orders o ON o.id = oi.order_id
@@ -1239,6 +1274,15 @@ export const cancelOrderItemBySeller = catchAsyncErrors(async (req, res, next) =
     } catch (error) {
       console.error("Failed to send item-cancellation email:", error.message);
     }
+
+    await createPersonalNotification({
+      userId: item.buyer_id,
+      type: "item_cancelled",
+      title: "An item in your order was cancelled",
+      message: `"${item.product_name}" from order #${item.order_id.slice(0, 8).toUpperCase()} was cancelled. ${refundInitiated ? `₹${refundAmount.toLocaleString("en-IN")} has been refunded.` : "Our team will follow up on your refund shortly."}`,
+      linkEntityType: "order",
+      linkEntityId: item.order_id,
+    });
 
     res.status(200).json({
       success: true,

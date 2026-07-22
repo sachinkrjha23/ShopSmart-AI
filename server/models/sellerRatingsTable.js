@@ -17,7 +17,7 @@ export async function createSellerRatingsTable() {
       );
     `;
     await database.query(query);
-    console.log("✅ Seller Ratings Table Created Or Already Exists.");
+    console.log("✅ Seller Ratings Table ready.");
   } catch (error) {
     console.error("❌ Failed To Create Seller Ratings Table.", error);
     process.exit(1);

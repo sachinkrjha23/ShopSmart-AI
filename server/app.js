@@ -15,7 +15,7 @@ import couponRouter from "./router/couponRoutes.js";
 import settingsRouter from "./router/settingsRoutes.js";
 import contactRouter from "./router/contactRoutes.js";
 import sellerRouter from "./router/sellerRoutes.js";
-
+import notificationRouter from "./router/notificationRoutes.js";
 
 
 const app = express();
@@ -25,7 +25,7 @@ config({path: "./config/config.env"});
 app.use(cookieParser());
 app.use(cors({
     origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true,
 }))
 
@@ -51,6 +51,7 @@ app.use("/api/v1/coupon", couponRouter);
 app.use("/api/v1/settings", settingsRouter);
 app.use("/api/v1/contact", contactRouter);
 app.use("/api/v1/seller", sellerRouter);
+app.use("/api/v1/notification", notificationRouter);
 
 
 await createTables();

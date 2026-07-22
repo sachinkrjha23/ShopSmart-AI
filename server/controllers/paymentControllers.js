@@ -5,7 +5,7 @@ import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
 import { applyPaymentSuccessEffects } from "../utils/applyPaymentSuccessEffects.js";
 import { generateInvoiceBuffer } from "../utils/generateInvoice.js";
-
+import { createPersonalNotification } from "./notificationControllers.js";
 
 const isValidUUID = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -248,9 +248,13 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
       if (coupon.type === "flat") {
         discountAmount = parseFloat(coupon.discount_value);
       } else {
-        discountAmount = (eligibleAmount * parseFloat(coupon.discount_value)) / 100;
+        discountAmount =
+          (eligibleAmount * parseFloat(coupon.discount_value)) / 100;
         if (coupon.max_discount !== null) {
-          discountAmount = Math.min(discountAmount, parseFloat(coupon.max_discount));
+          discountAmount = Math.min(
+            discountAmount,
+            parseFloat(coupon.max_discount),
+          );
         }
       }
 
@@ -274,7 +278,8 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
     const taxRateFraction = parseFloat(settings.tax_rate) / 100;
     const taxPrice =
       Math.round(
-        (discountedItemsPrice - discountedItemsPrice / (1 + taxRateFraction)) * 100,
+        (discountedItemsPrice - discountedItemsPrice / (1 + taxRateFraction)) *
+          100,
       ) / 100;
     const shippingPrice =
       discountedItemsPrice > parseFloat(settings.free_shipping_threshold)
@@ -298,18 +303,18 @@ export const createOrder = catchAsyncErrors(async (req, res, next) => {
     const {
       rows: [order],
     } = await client.query(
-          `INSERT INTO orders 
+      `INSERT INTO orders 
           (buyer_id, total_price, tax_price, shipping_price, order_status, coupon_code, discount_amount, pricing_mode)
           VALUES ($1, $2, $3, $4, 'Processing', $5, $6, 'inclusive')
           RETURNING *`,
-          [
-            buyerId,
-            totalPrice,
-            taxPrice,
-            shippingPrice,
-            coupon_code ? coupon_code.trim().toUpperCase() : null,
-            discountAmount,
-          ],
+      [
+        buyerId,
+        totalPrice,
+        taxPrice,
+        shippingPrice,
+        coupon_code ? coupon_code.trim().toUpperCase() : null,
+        discountAmount,
+      ],
     );
 
     for (const item of validatedItems) {
@@ -1030,6 +1035,23 @@ export const adminUpdateOrderStatus = catchAsyncErrors(
       [status, orderId],
     );
 
+    if (status === "Shipped" || status === "Delivered") {
+      await createPersonalNotification({
+        userId: rows[0].buyer_id,
+        type: status === "Shipped" ? "order_shipped" : "order_delivered",
+        title:
+          status === "Shipped"
+            ? "Your order has shipped"
+            : "Your order was delivered",
+        message:
+          status === "Shipped"
+            ? `Order #${orderId.slice(0, 8).toUpperCase()} is on its way.`
+            : `Order #${orderId.slice(0, 8).toUpperCase()} has been delivered.`,
+        linkEntityType: "order",
+        linkEntityId: orderId,
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: `Order status updated to "${status}".`,
@@ -1055,8 +1077,22 @@ export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
       throw new ErrorHandler("Invalid order ID.", 400);
     }
 
+    const sellerItemsCheck = await client.query(
+      `SELECT COUNT(*) FROM order_items oi
+       JOIN products p ON p.id = oi.product_id
+       WHERE oi.order_id = $1 AND p.seller_id IS NOT NULL`,
+      [orderId],
+    );
+
+    if (parseInt(sellerItemsCheck.rows[0].count) > 0) {
+      throw new ErrorHandler(
+        "This order contains items from a marketplace seller. Refunds for seller-owned items must go through the seller's own cancellation flow.",
+        403,
+      );
+    }
+
     const { rows } = await client.query(
-      `SELECT p.razorpay_payment_id, p.payment_status, o.total_price
+      `SELECT p.razorpay_payment_id, p.payment_status, o.total_price, o.buyer_id
        FROM payments p
        JOIN orders o ON o.id = p.order_id
        WHERE p.order_id = $1`,
@@ -1067,7 +1103,8 @@ export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
       throw new ErrorHandler("Payment record not found.", 404);
     }
 
-    const { razorpay_payment_id, payment_status, total_price } = rows[0];
+    const { razorpay_payment_id, payment_status, total_price, buyer_id } =
+      rows[0];
 
     if (payment_status === "Refunded") {
       throw new ErrorHandler("This order has already been refunded.", 400);
@@ -1099,6 +1136,15 @@ export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
     );
 
     await client.query("COMMIT");
+
+    await createPersonalNotification({
+      userId: buyer_id,
+      type: "order_refunded",
+      title: "Refund issued",
+      message: `A refund of ₹${(refundAmountPaise / 100).toFixed(2)} has been issued for order #${orderId.slice(0, 8).toUpperCase()}.`,
+      linkEntityType: "order",
+      linkEntityId: orderId,
+    });
 
     res.status(200).json({
       success: true,
@@ -1214,6 +1260,17 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
 
     await client.query("COMMIT");
 
+    await createPersonalNotification({
+      userId: order.buyer_id,
+      type: "order_cancelled",
+      title: "Order cancelled",
+      message: refundInitiated
+        ? `Order #${orderId.slice(0, 8).toUpperCase()} was cancelled and your refund has been initiated.`
+        : `Order #${orderId.slice(0, 8).toUpperCase()} was cancelled.`,
+      linkEntityType: "order",
+      linkEntityId: orderId,
+    });
+
     res.status(200).json({
       success: true,
       message: refundInitiated
@@ -1233,7 +1290,6 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
     client.release();
   }
 });
-
 
 // GET ORDER INVOICE (PDF)
 export const getOrderInvoice = catchAsyncErrors(async (req, res, next) => {
@@ -1271,7 +1327,6 @@ export const getOrderInvoice = catchAsyncErrors(async (req, res, next) => {
       [orderId, req.user.id],
     );
 
-
     if (rows.length === 0) {
       return next(new ErrorHandler("Order not found.", 404));
     }
@@ -1279,7 +1334,9 @@ export const getOrderInvoice = catchAsyncErrors(async (req, res, next) => {
     const order = rows[0];
 
     if (order.payment_status !== "Paid") {
-      return next(new ErrorHandler("Invoice is only available for paid orders.", 400));
+      return next(
+        new ErrorHandler("Invoice is only available for paid orders.", 400),
+      );
     }
 
     const pdfBuffer = await generateInvoiceBuffer(order);
@@ -1293,6 +1350,8 @@ export const getOrderInvoice = catchAsyncErrors(async (req, res, next) => {
   } catch (error) {
     console.error("❌ Error in getOrderInvoice:", error.message);
     console.error("Stack:", error.stack);
-    return next(new ErrorHandler(error.message || "Failed to generate invoice", 500));
+    return next(
+      new ErrorHandler(error.message || "Failed to generate invoice", 500),
+    );
   }
 });

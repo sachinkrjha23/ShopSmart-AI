@@ -73,6 +73,8 @@ import AdminSellers from "./pages/admin/Sellers";
 import AdminSellerDetail from "./pages/admin/SellerDetail";
 import { fetchMySellerProfile } from "./store/slices/sellerSlice";
 
+import NotificationInbox from "./pages/NotificationInbox";
+
 const App = () => {
   const dispatch = useDispatch();
   const location = useLocation();
@@ -153,6 +155,7 @@ const App = () => {
         <Route path="/payment-success" element={<PrivateRoute><PaymentSuccess /></PrivateRoute>} />
         <Route path="/payment-failed" element={<PrivateRoute><PaymentFailed /></PrivateRoute>} />
         <Route path="/orders" element={<PrivateRoute><Orders /></PrivateRoute>} />
+        <Route path="/notifications" element={<PrivateRoute><NotificationInbox /></PrivateRoute>} />
         <Route path="/orders/:id" element={<PrivateRoute><OrderDetail /></PrivateRoute>} />
         <Route path="/wishlist" element={<PrivateRoute><Wishlist /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />

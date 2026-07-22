@@ -15,6 +15,7 @@ import { createStoreSettingsTable } from "../models/storeSettingsTable.js";
 import { createContactMessagesTable } from "../models/contactMessagesTable.js";
 import { createSellersTable } from "../models/sellersTable.js";
 import { createSellerRatingsTable } from "../models/sellerRatingsTable.js";
+import { createNotificationTables } from "../models/notificationsTable.js";
 
 
 export const createTables = async() =>{
@@ -39,8 +40,8 @@ export const createTables = async() =>{
         await createStoreSettingsTable();
         await createContactMessagesTable();
         await createSellersTable();
-        await createSellersTable();
         await createSellerRatingsTable();
+        await createNotificationTables();
 
 
         await database.query(`
