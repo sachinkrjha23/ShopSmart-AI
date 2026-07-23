@@ -22,3 +22,7 @@ export const downloadInvoice = (orderId) =>
   axiosInstance.get(`/api/v1/payment/order/${orderId}/invoice`, {
     responseType: 'blob',
   })
+
+export const updateAdminItemFulfillmentStatus = (itemId, status) =>
+  axiosInstance.put(`/api/v1/payment/admin/order-item/${itemId}/fulfillment-status`, { status })
+

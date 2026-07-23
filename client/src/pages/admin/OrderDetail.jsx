@@ -14,6 +14,8 @@ import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import Button from "../../components/ui/Button";
 import Loader from "../../components/ui/Loader";
 import Tooltip from "../../components/ui/Tooltip";
+import { updateAdminItemFulfillmentStatus } from "../../store/slices/orderSlice";
+
 
 const PAYMENT_TAGS = {
   Pending: {
@@ -24,10 +26,13 @@ const PAYMENT_TAGS = {
   Refunded: { label: "Refunded", className: "bg-blue-50 text-blue-700" },
 };
 
-// Mirrors the backend's FORWARD_TRANSITIONS in adminUpdateOrderStatus —
-// keep these two in sync if that ever changes.
 const NEXT_STATUS = {
   Processing: "Shipped",
+  Shipped: "Delivered",
+};
+
+const ITEM_NEXT_STATUS = {
+  Pending: "Shipped",
   Shipped: "Delivered",
 };
 
@@ -58,6 +63,19 @@ const AdminOrderDetail = () => {
       toast.success(`Order status updated to "${nextStatus}".`);
     } catch (err) {
       toast.error(err || "Failed to update order status");
+    }
+  };
+
+  const handleAdvanceItemStatus = async (item) => {
+    const nextStatus = ITEM_NEXT_STATUS[item.fulfillmentStatus];
+    if (!nextStatus) return;
+    try {
+      await dispatch(
+        updateAdminItemFulfillmentStatus({ itemId: item.itemId, status: nextStatus }),
+      ).unwrap();
+      toast.success(`Item marked as "${nextStatus}".`);
+    } catch (err) {
+      toast.error(err || "Failed to update item status");
     }
   };
 
@@ -100,6 +118,7 @@ const AdminOrderDetail = () => {
   }
 
   const items = (order.items || []).filter(Boolean);
+  const hasSellerItems = items.some((item) => item.sellerId);
   const paymentTag = PAYMENT_TAGS[order.payment_status];
   const subtotal =
     Number(order.total_price) +
@@ -206,10 +225,24 @@ const AdminOrderDetail = () => {
                   {item.title}
                 </p>
                 <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                {!item.sellerId && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Fulfillment: {item.fulfillmentStatus}
+                  </p>
+                )}
               </div>
               <p className="text-sm font-medium text-gray-900">
                 ₹{(Number(item.price) * item.quantity).toLocaleString("en-IN")}
               </p>
+              {hasSellerItems && !item.sellerId && ITEM_NEXT_STATUS[item.fulfillmentStatus] && (
+                <Button
+                  onClick={() => handleAdvanceItemStatus(item)}
+                  disabled={loading}
+                  className="text-xs px-3 py-1.5"
+                >
+                  Mark as {ITEM_NEXT_STATUS[item.fulfillmentStatus]}
+                </Button>
+              )}
             </div>
           ))}
         </div>

@@ -1147,7 +1147,9 @@ export const updateFulfillmentStatus = catchAsyncErrors(async (req, res, next) =
   }
 
   const updated = await database.query(
-    `UPDATE order_items SET fulfillment_status = $1 WHERE id = $2 RETURNING *`,
+    status === "Delivered"
+      ? `UPDATE order_items SET fulfillment_status = $1, delivered_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`
+      : `UPDATE order_items SET fulfillment_status = $1 WHERE id = $2 RETURNING *`,
     [status, itemId],
   );
 

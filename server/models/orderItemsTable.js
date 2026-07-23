@@ -28,6 +28,9 @@ export async function createOrderItemTable() {
     await database.query(
       `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS refund_amount DECIMAL(10,2) DEFAULT NULL;`,
     );
+    await database.query(
+      `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP DEFAULT NULL;`,
+    );
   } catch (error) {
     console.error("❌ Failed To Create Order Items Table.", error);
     process.exit(1);

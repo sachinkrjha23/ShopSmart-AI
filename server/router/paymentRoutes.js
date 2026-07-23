@@ -5,7 +5,7 @@ import {
   createOrder, verifyPayment, handleWebhook, getMyOrders, getSingleOrder,
   adminGetAllOrders, adminGetSingleOrder, adminUpdateOrderStatus,
   adminInitiateRefund, cancelOrder, adminCancelOrder,
-  getOrderInvoice 
+  getOrderInvoice, adminUpdateItemFulfillmentStatus
 } from "../controllers/paymentControllers.js";
 
 const paymentLimiter = rateLimit({
@@ -46,6 +46,7 @@ router.delete("/cancel/:orderId", isAuthenticated, cancelOrder);
 router.get("/admin/all-orders", isAuthenticated, authorizedRoles("Admin"), adminGetAllOrders);
 router.get("/admin/order/:orderId", isAuthenticated, authorizedRoles("Admin"), adminGetSingleOrder);
 router.put("/admin/order/:orderId", isAuthenticated, authorizedRoles("Admin"), adminUpdateOrderStatus);
+router.put("/admin/order-item/:itemId/fulfillment-status", isAuthenticated, authorizedRoles("Admin"), adminUpdateItemFulfillmentStatus);
 router.post("/admin/refund", isAuthenticated, authorizedRoles("Admin"), adminInitiateRefund);
 router.delete("/admin/cancel/:orderId", isAuthenticated, authorizedRoles("Admin"), adminCancelOrder);
 

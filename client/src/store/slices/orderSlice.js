@@ -8,6 +8,7 @@ import {
   getAdminSingleOrder,
   updateOrderStatus as updateOrderStatusApi,
   adminCancelOrder as adminCancelOrderApi,
+  updateAdminItemFulfillmentStatus as updateAdminItemFulfillmentStatusApi,
 } from "../../api/orderApi";
 
 export const createOrder = createAsyncThunk(
@@ -117,6 +118,20 @@ export const updateOrderStatus = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || "Failed to update order status",
+      );
+    }
+  },
+);
+
+export const updateAdminItemFulfillmentStatus = createAsyncThunk(
+  "order/updateAdminItemFulfillmentStatus",
+  async ({ itemId, status }, { rejectWithValue }) => {
+    try {
+      const res = await updateAdminItemFulfillmentStatusApi(itemId, status);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to update item status",
       );
     }
   },
@@ -283,6 +298,21 @@ const orderSlice = createSlice({
       })
       .addCase(updateOrderStatus.rejected, (state, action) => {
         state.loading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(updateAdminItemFulfillmentStatus.fulfilled, (state, action) => {
+        const updatedItem = action.payload.item;
+        if (state.adminSingleOrder?.items) {
+          const itemIndex = state.adminSingleOrder.items.findIndex(
+            (i) => i.itemId === updatedItem.id,
+          );
+          if (itemIndex !== -1) {
+            state.adminSingleOrder.items[itemIndex].fulfillmentStatus = updatedItem.fulfillment_status;
+          }
+        }
+      })
+      .addCase(updateAdminItemFulfillmentStatus.rejected, (state, action) => {
         state.error = action.payload;
       });
 

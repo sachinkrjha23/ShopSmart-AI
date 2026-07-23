@@ -6,6 +6,7 @@ import { catchAsyncErrors } from "../middlewares/catchAsyncError.js";
 import { applyPaymentSuccessEffects } from "../utils/applyPaymentSuccessEffects.js";
 import { generateInvoiceBuffer } from "../utils/generateInvoice.js";
 import { createPersonalNotification } from "./notificationControllers.js";
+import { sendEmail } from "../utils/sendEmail.js";
 
 const isValidUUID = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -919,7 +920,9 @@ export const adminGetSingleOrder = catchAsyncErrors(async (req, res, next) => {
       s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
       json_agg(
         json_build_object(
+          'itemId',    oi.id,
           'productId', oi.product_id,
+          'sellerId',  prod.seller_id,
           'title',     oi.title,
           'image',     oi.image,
           'quantity',  oi.quantity,
@@ -928,10 +931,11 @@ export const adminGetSingleOrder = catchAsyncErrors(async (req, res, next) => {
         )
       ) AS items
      FROM orders o
-     LEFT JOIN users         u  ON u.id = o.buyer_id
-     LEFT JOIN payments      p  ON p.order_id  = o.id
-     LEFT JOIN shipping_info s  ON s.order_id  = o.id
-     LEFT JOIN order_items   oi ON oi.order_id = o.id
+     LEFT JOIN users         u    ON u.id = o.buyer_id
+     LEFT JOIN payments      p    ON p.order_id  = o.id
+     LEFT JOIN shipping_info s    ON s.order_id  = o.id
+     LEFT JOIN order_items   oi   ON oi.order_id = o.id
+     LEFT JOIN products      prod ON prod.id = oi.product_id
      WHERE o.id = $1
      GROUP BY o.id, u.id, p.id, s.id`,
     [orderId],
@@ -1028,28 +1032,52 @@ export const adminUpdateOrderStatus = catchAsyncErrors(
     }
 
     const { rows } = await database.query(
-      `UPDATE orders
-     SET order_status = $1, updated_at = CURRENT_TIMESTAMP
-     WHERE id = $2
-     RETURNING *`,
+      `UPDATE orders o
+       SET order_status = $1, updated_at = CURRENT_TIMESTAMP
+       FROM users u
+       WHERE o.id = $2 AND u.id = o.buyer_id
+       RETURNING o.*, u.name AS buyer_name, u.email AS buyer_email`,
       [status, orderId],
     );
+
+    if (status === "Delivered") {
+      await database.query(
+        `UPDATE order_items oi
+         SET fulfillment_status = 'Delivered', delivered_at = CURRENT_TIMESTAMP
+         FROM products p
+         WHERE oi.product_id = p.id
+           AND oi.order_id = $1
+           AND p.seller_id IS NULL
+           AND oi.fulfillment_status NOT IN ('Delivered', 'Cancelled')`,
+        [orderId],
+      );
+    }
 
     if (status === "Shipped" || status === "Delivered") {
       await createPersonalNotification({
         userId: rows[0].buyer_id,
         type: status === "Shipped" ? "order_shipped" : "order_delivered",
-        title:
-          status === "Shipped"
-            ? "Your order has shipped"
-            : "Your order was delivered",
-        message:
-          status === "Shipped"
-            ? `Order #${orderId.slice(0, 8).toUpperCase()} is on its way.`
-            : `Order #${orderId.slice(0, 8).toUpperCase()} has been delivered.`,
+        title: status === "Shipped" ? "Your order has shipped" : "Your order was delivered",
+        message: status === "Shipped"
+          ? `Order #${orderId.slice(0, 8).toUpperCase()} is on its way.`
+          : `Order #${orderId.slice(0, 8).toUpperCase()} has been delivered.`,
         linkEntityType: "order",
         linkEntityId: orderId,
       });
+
+      try {
+        await sendEmail({
+          email: rows[0].buyer_email,
+          subject: status === "Shipped"
+            ? "ShopSmart-AI - Your Order Has Shipped"
+            : "ShopSmart-AI - Your Order Was Delivered",
+          message: status === "Shipped"
+            ? `<p>Hi ${rows[0].buyer_name},</p><p>Your order #${orderId.slice(0, 8).toUpperCase()} is on its way.</p>`
+            : `<p>Hi ${rows[0].buyer_name},</p><p>Your order #${orderId.slice(0, 8).toUpperCase()} has been delivered. We hope you love it!</p>`,
+        });
+      } catch (error) {
+        console.error(`Failed to send order-${status.toLowerCase()} email:`, error.message);
+      }
     }
 
     res.status(200).json({
@@ -1059,6 +1087,65 @@ export const adminUpdateOrderStatus = catchAsyncErrors(
     });
   },
 );
+
+// 8b. ADMIN — UPDATE FULFILLMENT STATUS FOR AN ADMIN-OWNED ITEM
+export const adminUpdateItemFulfillmentStatus = catchAsyncErrors(async (req, res, next) => {
+  const { itemId } = req.params;
+  const { status } = req.body;
+
+  if (!isValidUUID(itemId)) {
+    return next(new ErrorHandler("Invalid item ID.", 400));
+  }
+
+  const validStatuses = ["Shipped", "Delivered"];
+  if (!validStatuses.includes(status)) {
+    return next(new ErrorHandler(`Invalid status. Must be one of: ${validStatuses.join(", ")}`, 400));
+  }
+
+  const itemResult = await database.query(
+    `SELECT oi.id, oi.fulfillment_status, oi.order_id, o.buyer_id, p.name AS product_name
+     FROM order_items oi
+     JOIN products p ON p.id = oi.product_id
+     JOIN orders o ON o.id = oi.order_id
+     WHERE oi.id = $1 AND p.seller_id IS NULL`,
+    [itemId],
+  );
+
+  if (itemResult.rows.length === 0) {
+    return next(new ErrorHandler("Item not found, or it is not an admin-owned product.", 404));
+  }
+
+  const { fulfillment_status: currentStatus, order_id, buyer_id, product_name } = itemResult.rows[0];
+
+  const FORWARD_TRANSITIONS = { Pending: "Shipped", Shipped: "Delivered" };
+  if (FORWARD_TRANSITIONS[currentStatus] !== status) {
+    return next(new ErrorHandler(`Cannot move from "${currentStatus}" to "${status}".`, 400));
+  }
+
+  const updated = await database.query(
+    status === "Delivered"
+      ? `UPDATE order_items SET fulfillment_status = $1, delivered_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`
+      : `UPDATE order_items SET fulfillment_status = $1 WHERE id = $2 RETURNING *`,
+    [status, itemId],
+  );
+
+  await createPersonalNotification({
+    userId: buyer_id,
+    type: status === "Shipped" ? "item_shipped" : "item_delivered",
+    title: status === "Shipped" ? "An item has shipped" : "An item was delivered",
+    message: status === "Shipped"
+      ? `"${product_name}" from order #${order_id.slice(0, 8).toUpperCase()} is on its way.`
+      : `"${product_name}" from order #${order_id.slice(0, 8).toUpperCase()} has been delivered.`,
+    linkEntityType: "order",
+    linkEntityId: order_id,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `Item marked as "${status}".`,
+    item: updated.rows[0],
+  });
+});
 
 // 9. ADMIN — INITIATE REFUND
 export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
