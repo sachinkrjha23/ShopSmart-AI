@@ -1,7 +1,11 @@
 import StarRating from '../ui/StarRating'
+import ReportButton from '../report/ReportButton'
+import { useSelector } from 'react-redux'
 
 const ReviewCard = ({ review }) => {
-  const { rating, comment, reviewer } = review
+  const { rating, comment, reviewer, review_id } = review
+  const { user } = useSelector((state) => state.auth)
+  const isOwnReview = user?.id === reviewer?.id
 
   const avatarUrl = reviewer?.avatar?.url || null
   const initial = reviewer?.name?.charAt(0).toUpperCase() || '?'
@@ -9,7 +13,6 @@ const ReviewCard = ({ review }) => {
   return (
     <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
       <div className="flex items-start gap-3">
-        {/* Avatar */}
         {avatarUrl ? (
           <img
             src={avatarUrl}
@@ -23,7 +26,6 @@ const ReviewCard = ({ review }) => {
           </div>
         )}
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-sm font-medium text-gray-800">{reviewer?.name || 'Anonymous'}</p>
@@ -31,6 +33,11 @@ const ReviewCard = ({ review }) => {
           </div>
           {comment && (
             <p className="text-sm text-gray-600 mt-1 leading-relaxed">{comment}</p>
+          )}
+          {!isOwnReview && (
+            <div className="mt-2">
+              <ReportButton entityType="review" entityId={review_id} label="Report" />
+            </div>
           )}
         </div>
       </div>

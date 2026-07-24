@@ -42,15 +42,15 @@ const AdminUsers = () => {
   }
 
   const handleDeleteConfirm = async () => {
-    const id = deleteTarget
-    setDeleteTarget(null)
-    try {
-      await dispatch(deleteUser(id)).unwrap()
-      toast.success('User deleted successfully.')
-    } catch (err) {
-      toast.error(err || 'Failed to delete user')
-    }
+  const id = deleteTarget
+  setDeleteTarget(null)
+  try {
+    await dispatch(deleteUser({ id })).unwrap()
+    toast.success('User deleted successfully.')
+  } catch (err) {
+    toast.error(err || 'Failed to delete user')
   }
+}
 
   return (
     <div className="flex flex-col gap-6">

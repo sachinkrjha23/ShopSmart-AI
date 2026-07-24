@@ -11,6 +11,9 @@ import useCart from "../hooks/useCart";
 import WishlistButton from "../components/wishlist/WishlistButton";
 import ImageCarousel from "../components/ui/ImageCarousel";
 import ReviewForm from "../components/product/ReviewForm";
+import ReportButton from "../components/report/ReportButton";
+
+
 const ProductDetail = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -157,6 +160,10 @@ const ProductDetail = () => {
                   </Link>
                 </p>
               )}
+
+              <div>
+                <ReportButton entityType="product" entityId={product.id} label="Report this product" />
+              </div>
 
               <hr className="border-gray-100" />
 

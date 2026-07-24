@@ -1,5 +1,5 @@
 import express from "express";
-import { getAllUsers, deleteUser, dashboardStats} from "../controllers/adminControllers.js";
+import { getAllUsers, deleteUser, dashboardStats, adminGetActivityLog } from "../controllers/adminControllers.js";
 import { authorizedRoles, isAuthenticated,} from "../middlewares/authMiddleware.js";
 import { setAdminSecret } from "../controllers/adminControllers.js";
 
@@ -12,5 +12,7 @@ router.delete("/delete/:id",isAuthenticated,authorizedRoles("Admin"),deleteUser,
 router.get("/fetch/dashboard-stats",isAuthenticated,authorizedRoles("Admin"),dashboardStats,);
 
 router.put("/set-secret", isAuthenticated, authorizedRoles("Admin"), setAdminSecret);
+
+router.get("/activity-log", isAuthenticated, authorizedRoles("Admin"), adminGetActivityLog);
 
 export default router;

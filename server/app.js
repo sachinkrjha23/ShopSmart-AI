@@ -17,7 +17,7 @@ import contactRouter from "./router/contactRoutes.js";
 import sellerRouter from "./router/sellerRoutes.js";
 import notificationRouter from "./router/notificationRoutes.js";
 import returnRouter from "./router/returnRoutes.js";
-
+import reportRouter from "./router/reportRoutes.js";
 
 const app = express();
 
@@ -54,6 +54,7 @@ app.use("/api/v1/contact", contactRouter);
 app.use("/api/v1/seller", sellerRouter);
 app.use("/api/v1/notification", notificationRouter);
 app.use("/api/v1/return", returnRouter);
+app.use("/api/v1/report", reportRouter);
 
 
 await createTables();

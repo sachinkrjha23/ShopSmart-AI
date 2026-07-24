@@ -44,6 +44,9 @@ import Users from "./pages/admin/Users";
 import Reviews from "./pages/admin/Reviews";
 import Coupons from "./pages/admin/Coupons";
 import Settings from "./pages/admin/Settings";
+import ActivityLog from "./pages/admin/ActivityLog";
+import Reports from "./pages/admin/Reports";
+
 
 import Navbar from "./components/layout/Navbar";
 import LoginModal from "./components/auth/LoginModal";
@@ -55,6 +58,7 @@ import { fetchWishlist } from "./store/slices/wishlistSlice";
 import { useSelector } from "react-redux";
 import Messages from "./pages/admin/Messages";
 import ScrollToTop from "./components/layout/ScrollToTop";
+
 
 // Seller
 import SellerRoute from "./routes/SellerRoute";
@@ -182,6 +186,8 @@ const App = () => {
         <Route path="/admin/messages" element={<AdminRoute><Messages /></AdminRoute>} />
         <Route path="/admin/settings" element={<AdminRoute><Settings /></AdminRoute>} />
         <Route path="/admin/returns" element={<AdminRoute><AdminReturns /></AdminRoute>} />
+        <Route path="/admin/activity-log" element={<AdminRoute><ActivityLog /></AdminRoute>} />
+        <Route path="/admin/reports" element={<AdminRoute><Reports /></AdminRoute>} />
 
         {/* Seller */}
         <Route path="/become-seller" element={<PrivateRoute><BecomeSeller /></PrivateRoute>} />

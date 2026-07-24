@@ -10,6 +10,7 @@ import ProductGrid from "../components/product/ProductGrid";
 import Pagination from "../components/ui/Pagination";
 import Loader from "../components/ui/Loader";
 import Button from "../components/ui/Button";
+import ReportButton from "../components/report/ReportButton";
 
 const SellerProfile = () => {
   const { sellerId } = useParams();
@@ -107,6 +108,9 @@ const SellerProfile = () => {
               {seller.description}
             </p>
           )}
+          <div className="mt-3">
+            <ReportButton entityType="seller" entityId={sellerId} label="Report this seller" />
+          </div>
         </div>
       </div>
 

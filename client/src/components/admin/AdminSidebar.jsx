@@ -11,6 +11,8 @@ const NAV_ITEMS = [
   { to: '/admin/coupons', label: 'Coupons' },
   { to: '/admin/messages', label: 'Messages' },
   { to: '/admin/settings', label: 'Settings' },
+  { to: '/admin/activity-log', label: 'Activity Log' },
+  { to: '/admin/reports', label: 'Reports' },
 ]
 
 const AdminSidebar = () => {

@@ -18,6 +18,7 @@ import { createSellerRatingsTable } from "../models/sellerRatingsTable.js";
 import { createNotificationTables } from "../models/notificationsTable.js";
 import { createReturnRequestsTable } from "../models/returnRequestsTable.js";
 import { createAdminActivityLogTable } from "../models/adminActivityLogTable.js";
+import { createReportsTable } from "../models/reportsTable.js";
 
 
 export const createTables = async() =>{
@@ -46,6 +47,7 @@ export const createTables = async() =>{
         await createNotificationTables();
         await createReturnRequestsTable();
         await createAdminActivityLogTable();
+        await createReportsTable();
 
 
         await database.query(`

@@ -314,3 +314,58 @@ export const dashboardStats = catchAsyncErrors(async (req, res, next) => {
     totalOrdersPlaced,
   });
 });
+
+export const adminGetActivityLog = catchAsyncErrors(async (req, res, next) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 15;
+  const offset = (page - 1) * limit;
+
+  const { actionType, entityType, fromDate, toDate } = req.query;
+
+  const conditions = [];
+  const values = [];
+  let idx = 1;
+
+  if (actionType) {
+    conditions.push(`al.action_type = $${idx++}`);
+    values.push(actionType);
+  }
+  if (entityType) {
+    conditions.push(`al.entity_type = $${idx++}`);
+    values.push(entityType);
+  }
+  if (fromDate) {
+    conditions.push(`al.created_at >= $${idx++}`);
+    values.push(fromDate);
+  }
+  if (toDate) {
+    conditions.push(`al.created_at < $${idx++}::date + INTERVAL '1 day'`);
+    values.push(toDate);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const totalResult = await database.query(
+    `SELECT COUNT(*) FROM admin_activity_log al ${whereClause}`,
+    values,
+  );
+  const totalLogs = parseInt(totalResult.rows[0].count);
+
+  const logsResult = await database.query(
+    `SELECT al.id, al.action_type, al.entity_type, al.entity_id, al.details, al.created_at,
+            u.name AS admin_name, u.email AS admin_email
+       FROM admin_activity_log al
+       LEFT JOIN users u ON u.id = al.admin_id
+       ${whereClause}
+       ORDER BY al.created_at DESC
+       LIMIT $${idx++} OFFSET $${idx++}`,
+    [...values, limit, offset],
+  );
+
+  res.status(200).json({
+    success: true,
+    totalLogs,
+    currentPage: page,
+    logs: logsResult.rows,
+  });
+});

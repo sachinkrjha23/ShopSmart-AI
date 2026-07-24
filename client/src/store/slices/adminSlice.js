@@ -3,6 +3,7 @@ import {
   getDashboardStats,
   getAllUsers,
   deleteUser as deleteUserApi,
+  getActivityLog as getActivityLogApi,
 } from "../../api/adminApi";
 
 export const fetchDashboardStats = createAsyncThunk(
@@ -33,11 +34,25 @@ export const fetchAllUsers = createAsyncThunk(
   },
 );
 
+export const fetchActivityLog = createAsyncThunk(
+  "admin/fetchActivityLog",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const res = await getActivityLogApi(params);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch activity log",
+      );
+    }
+  },
+);
+
 export const deleteUser = createAsyncThunk(
   "admin/deleteUser",
-  async (id, { rejectWithValue }) => {
+  async ({ id, adminSecret }, { rejectWithValue }) => {
     try {
-      await deleteUserApi(id);
+      await deleteUserApi(id, adminSecret);
       return id;
     } catch (err) {
       return rejectWithValue(
@@ -52,6 +67,9 @@ const initialState = {
   users: [],
   totalUsers: 0,
   currentPage: 1,
+  activityLogs: [],
+  totalActivityLogs: 0,
+  activityLogPage: 1,
   loading: false,
   error: null,
 };
@@ -91,6 +109,22 @@ const adminSlice = createSlice({
         state.currentPage = action.payload.currentPage;
       })
       .addCase(fetchAllUsers.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    builder
+      .addCase(fetchActivityLog.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchActivityLog.fulfilled, (state, action) => {
+        state.loading = false;
+        state.activityLogs = action.payload.logs;
+        state.totalActivityLogs = action.payload.totalLogs;
+        state.activityLogPage = action.payload.currentPage;
+      })
+      .addCase(fetchActivityLog.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
