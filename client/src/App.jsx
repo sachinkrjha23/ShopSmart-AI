@@ -67,11 +67,13 @@ import SellerAddProduct from "./pages/seller/AddProduct";
 import SellerEditProduct from "./pages/seller/EditProduct";
 import SellerProfile from "./pages/SellerProfile";
 import SellerCoupons from "./pages/seller/Coupons";
+import SellerReturns from "./pages/seller/Returns";
 
 // Seller - Admin
 import AdminSellers from "./pages/admin/Sellers";
 import AdminSellerDetail from "./pages/admin/SellerDetail";
 import { fetchMySellerProfile } from "./store/slices/sellerSlice";
+import AdminReturns from "./pages/admin/Returns";
 
 import NotificationInbox from "./pages/NotificationInbox";
 
@@ -179,6 +181,7 @@ const App = () => {
         <Route path="/admin/coupons" element={<AdminRoute><Coupons /></AdminRoute>} />
         <Route path="/admin/messages" element={<AdminRoute><Messages /></AdminRoute>} />
         <Route path="/admin/settings" element={<AdminRoute><Settings /></AdminRoute>} />
+        <Route path="/admin/returns" element={<AdminRoute><AdminReturns /></AdminRoute>} />
 
         {/* Seller */}
         <Route path="/become-seller" element={<PrivateRoute><BecomeSeller /></PrivateRoute>} />
@@ -189,6 +192,7 @@ const App = () => {
         <Route path="/seller/products/add" element={<SellerRoute><SellerAddProduct /></SellerRoute>} />
         <Route path="/seller/products/edit/:id" element={<SellerRoute><SellerEditProduct /></SellerRoute>} />
         <Route path="/seller/coupons" element={<SellerRoute><SellerCoupons /></SellerRoute>} />
+        <Route path="/seller/returns" element={<SellerRoute><SellerReturns /></SellerRoute>} />
 
         {/* Seller - Admin */}
         <Route path="/admin/sellers" element={<AdminRoute><AdminSellers /></AdminRoute>} />

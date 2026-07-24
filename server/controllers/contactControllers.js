@@ -3,6 +3,7 @@ import ErrorHandler from "../middlewares/errorMiddleware.js";
 import database from "../database/db.js";
 import validator from "validator";
 import { sendEmail } from "../utils/sendEmail.js";
+import { logAdminActivity } from "../utils/adminActivityLogger.js";
 
 export const submitContactMessage = catchAsyncErrors(async (req, res, next) => {
   const { name, email, subject, message } = req.body;
@@ -110,6 +111,13 @@ export const adminDeleteContactMessage = catchAsyncErrors(async (req, res, next)
   if (result.rows.length === 0) {
     return next(new ErrorHandler("Message not found.", 404));
   }
+
+  await logAdminActivity({
+    adminId: req.user.id,
+    actionType: "contact_message_deleted",
+    entityType: "contact_message",
+    entityId: id,
+  });
 
   res.status(200).json({
     success: true,

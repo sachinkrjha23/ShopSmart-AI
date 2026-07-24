@@ -16,6 +16,7 @@ import settingsRouter from "./router/settingsRoutes.js";
 import contactRouter from "./router/contactRoutes.js";
 import sellerRouter from "./router/sellerRoutes.js";
 import notificationRouter from "./router/notificationRoutes.js";
+import returnRouter from "./router/returnRoutes.js";
 
 
 const app = express();
@@ -52,6 +53,7 @@ app.use("/api/v1/settings", settingsRouter);
 app.use("/api/v1/contact", contactRouter);
 app.use("/api/v1/seller", sellerRouter);
 app.use("/api/v1/notification", notificationRouter);
+app.use("/api/v1/return", returnRouter);
 
 
 await createTables();

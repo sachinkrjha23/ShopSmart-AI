@@ -12,7 +12,7 @@ import settingsReducer from "./slices/settingsSlice";
 import contactReducer from "./slices/contactSlice";
 import sellerReducer from "./slices/sellerSlice"
 import notificationReducer from "./slices/notificationSlice"
-
+import returnReducer from "./slices/returnSlice";
 
 
 const store = configureStore({
@@ -30,6 +30,7 @@ const store = configureStore({
     contact: contactReducer,
     seller: sellerReducer,
     notification: notificationReducer,
+    returns: returnReducer,
   },
 });
 

@@ -7,6 +7,7 @@ import { applyPaymentSuccessEffects } from "../utils/applyPaymentSuccessEffects.
 import { generateInvoiceBuffer } from "../utils/generateInvoice.js";
 import { createPersonalNotification } from "./notificationControllers.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { logAdminActivity } from "../utils/adminActivityLogger.js";
 
 const isValidUUID = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -685,14 +686,18 @@ export const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
       s.full_name, s.address, s.city, s.state, s.pincode, s.phone,
       json_agg(
         json_build_object(
+          'itemId',    oi.id,
           'productId', oi.product_id,
           'title',     oi.title,
           'image',     oi.image,
           'quantity',  oi.quantity,
           'price',     oi.price,
           'fulfillmentStatus', oi.fulfillment_status,
+          'deliveredAt', oi.delivered_at,
           'sellerId', p2.seller_id,
-          'sellerStoreName', s2.store_name
+          'sellerStoreName', s2.store_name,
+          'returnStatus', rr.status,
+          'returnRequestedAt', rr.requested_at
         )
       ) AS items
      FROM orders o
@@ -701,6 +706,13 @@ export const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
      LEFT JOIN order_items oi ON oi.order_id = o.id
      LEFT JOIN products p2 ON p2.id = oi.product_id
      LEFT JOIN sellers s2 ON s2.id = p2.seller_id
+     LEFT JOIN LATERAL (
+       SELECT status, requested_at
+       FROM return_requests rr2
+       WHERE rr2.order_item_id = oi.id
+       ORDER BY rr2.requested_at DESC
+       LIMIT 1
+     ) rr ON true
      WHERE o.id = $1 AND o.buyer_id = $2
      GROUP BY o.id, p.id, s.id`,
     [orderId, buyerId],
@@ -1080,6 +1092,14 @@ export const adminUpdateOrderStatus = catchAsyncErrors(
       }
     }
 
+    await logAdminActivity({
+      adminId: req.user.id,
+      actionType: "order_status_updated",
+      entityType: "order",
+      entityId: orderId,
+      details: { from: currentStatus, to: status },
+    });
+
     res.status(200).json({
       success: true,
       message: `Order status updated to "${status}".`,
@@ -1138,6 +1158,14 @@ export const adminUpdateItemFulfillmentStatus = catchAsyncErrors(async (req, res
       : `"${product_name}" from order #${order_id.slice(0, 8).toUpperCase()} has been delivered.`,
     linkEntityType: "order",
     linkEntityId: order_id,
+  });
+
+  await logAdminActivity({
+    adminId: req.user.id,
+    actionType: "item_fulfillment_updated",
+    entityType: "order_item",
+    entityId: itemId,
+    details: { from: currentStatus, to: status },
   });
 
   res.status(200).json({
@@ -1224,6 +1252,14 @@ export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
 
     await client.query("COMMIT");
 
+    await logAdminActivity({
+      adminId: req.user.id,
+      actionType: "order_refunded",
+      entityType: "order",
+      entityId: orderId,
+      details: { amount: (refundAmountPaise / 100).toFixed(2) },
+    });
+
     await createPersonalNotification({
       userId: buyer_id,
       type: "order_refunded",
@@ -1240,10 +1276,11 @@ export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
       amount: (refundAmountPaise / 100).toFixed(2),
     });
   } catch (error) {
+    console.error("Admin refund failed:", error.error?.description || error.message);
     await client.query("ROLLBACK");
     return next(
       new ErrorHandler(
-        error.message || "Refund failed.",
+        error.error?.description || error.message || "Refund failed.",
         error.statusCode || 500,
       ),
     );
@@ -1341,11 +1378,19 @@ export const adminCancelOrder = catchAsyncErrors(async (req, res, next) => {
 
         refundInitiated = true;
       } catch (err) {
-        console.error("Admin auto refund failed:", err.message);
+        console.error("Admin auto refund failed:", err.error?.description || err.message);
       }
     }
 
     await client.query("COMMIT");
+
+    await logAdminActivity({
+      adminId: req.user.id,
+      actionType: "order_cancelled",
+      entityType: "order",
+      entityId: orderId,
+      details: { refundInitiated },
+    });
 
     await createPersonalNotification({
       userId: order.buyer_id,

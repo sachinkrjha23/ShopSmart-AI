@@ -5,6 +5,7 @@ import { sendEmail } from "../utils/sendEmail.js";
 import { v2 as cloudinary } from "cloudinary";
 import Razorpay from "razorpay";
 import { createPersonalNotification } from "./notificationControllers.js";
+import { logAdminActivity } from "../utils/adminActivityLogger.js";
 
 const REAPPLY_COOLDOWN_DAYS = 10;
 const SUSPENSION_COOLDOWN_DAYS = 30;
@@ -316,6 +317,14 @@ export const adminApproveSeller = catchAsyncErrors(async (req, res, next) => {
     message: `Your seller application for "${seller.store_name}" has been approved. You can now start listing products.`,
   });
 
+  await logAdminActivity({
+    adminId: req.user.id,
+    actionType: "seller_approved",
+    entityType: "seller",
+    entityId: seller.id,
+    details: { storeName: seller.store_name },
+  });
+
   res.status(200).json({
     success: true,
     message: "Seller approved successfully.",
@@ -375,6 +384,14 @@ export const adminRejectSeller = catchAsyncErrors(async (req, res, next) => {
     type: "seller_rejected",
     title: "Seller application update",
     message: `Your seller application for "${seller.store_name}" was not approved. Reason: ${reason.trim()}`,
+  });
+
+  await logAdminActivity({
+    adminId: req.user.id,
+    actionType: "seller_rejected",
+    entityType: "seller",
+    entityId: seller.id,
+    details: { storeName: seller.store_name, reason: reason.trim() },
   });
 
   res.status(200).json({
@@ -437,6 +454,14 @@ export const adminSuspendSeller = catchAsyncErrors(async (req, res, next) => {
     type: "seller_suspended",
     title: "Seller account suspended",
     message: `Your seller account "${seller.store_name}" has been suspended. Reason: ${reason.trim()}`,
+  });
+
+  await logAdminActivity({
+    adminId: req.user.id,
+    actionType: "seller_suspended",
+    entityType: "seller",
+    entityId: seller.id,
+    details: { storeName: seller.store_name, reason: reason.trim() },
   });
 
   res.status(200).json({

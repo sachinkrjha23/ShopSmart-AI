@@ -6,7 +6,7 @@ export const createNotificationTables = async () => {
       id                UUID DEFAULT gen_random_uuid() PRIMARY KEY,
       scope             VARCHAR(20) NOT NULL CHECK (scope IN ('personal', 'broadcast')),
       user_id           UUID REFERENCES users(id) ON DELETE CASCADE,
-      target_audience   VARCHAR(30) CHECK (target_audience IN ('buyers_only', 'buyers_and_sellers', 'all_including_admins')),
+      target_audience   VARCHAR(30) CHECK (target_audience IN ('buyers_and_sellers', 'all_including_admins')),
       type              VARCHAR(50) NOT NULL,
       title             VARCHAR(200) NOT NULL,
       message           TEXT NOT NULL,

@@ -4,6 +4,7 @@ import database from "../database/db.js";
 import { v2 as cloudinary } from "cloudinary";
 import { anonymizeUser } from "../utils/anonymizeUser.js";
 import bcrypt from "bcrypt";
+import { logAdminActivity } from "../utils/adminActivityLogger.js";
 
 export const getAllUsers = catchAsyncErrors(async (req, res, next) => {
   const page = parseInt(req.query.page) || 1;
@@ -34,7 +35,7 @@ export const getAllUsers = catchAsyncErrors(async (req, res, next) => {
 
 export const deleteUser = catchAsyncErrors(async (req, res, next) => {
   const { id } = req.params;
-  const { adminSecret } = req.body;
+  const { adminSecret } = req.body || {};
 
   if (id === req.user.id) {
     return next(
@@ -98,6 +99,14 @@ export const deleteUser = catchAsyncErrors(async (req, res, next) => {
   }
 
   await anonymizeUser(id, targetUser.avatar?.public_id);
+
+  await logAdminActivity({
+    adminId: req.user.id,
+    actionType: "user_deleted",
+    entityType: "user",
+    entityId: id,
+    details: { email: targetUser.email, role: targetUser.role },
+  });
 
   res.status(200).json({
     success: true,

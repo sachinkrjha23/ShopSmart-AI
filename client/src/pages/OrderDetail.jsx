@@ -15,6 +15,7 @@ import Button from "../components/ui/Button";
 import Loader from "../components/ui/Loader";
 import { downloadInvoice } from "../api/orderApi";
 import RateSellerModal from "../components/order/RateSellerModal";
+import RequestReturnModal from "../components/order/RequestReturnModal";
 
 const PAYMENT_TAGS = {
   Pending: {
@@ -32,6 +33,31 @@ const FULFILLMENT_VARIANTS = {
   Cancelled: "danger",
 };
 
+const RETURN_WINDOW_DAYS = 7;
+
+// Mirrors the backend's eligibility check in createReturnRequest — kept here
+// only for UI display (button visibility). The server re-validates everything
+// independently at request time, this is not a source of truth.
+const getReturnInfo = (item) => {
+  if (item.returnStatus === "Pending")
+    return { eligible: false, badge: "Pending" };
+  if (item.returnStatus === "Approved")
+    return { eligible: false, badge: "Approved" };
+
+  if (item.fulfillmentStatus !== "Delivered" || !item.deliveredAt) {
+    return { eligible: false, badge: null };
+  }
+
+  const daysSinceDelivery =
+    (Date.now() - new Date(item.deliveredAt).getTime()) / 86400000;
+  const withinWindow = daysSinceDelivery <= RETURN_WINDOW_DAYS;
+
+  return {
+    eligible: withinWindow,
+    badge: item.returnStatus === "Rejected" ? "Rejected" : null,
+  };
+};
+
 const OrderDetail = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -45,6 +71,7 @@ const OrderDetail = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [rateModalOpen, setRateModalOpen] = useState(false);
   const [ratingSeller, setRatingSeller] = useState(null);
+  const [returnModalItem, setReturnModalItem] = useState(null);
 
   useEffect(() => {
     dispatch(fetchSingleOrder(id));
@@ -160,7 +187,9 @@ const OrderDetail = () => {
 
         {hasSellerItems && (
           <p className="text-xs text-gray-400 mt-3">
-            This order includes items from a marketplace seller — their delivery progress is tracked individually below, and may not match the overall status shown above.
+            This order includes items from a marketplace seller — their delivery
+            progress is tracked individually below, and may not match the
+            overall status shown above.
           </p>
         )}
       </div>
@@ -168,36 +197,69 @@ const OrderDetail = () => {
       <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Items</h2>
         <div className="flex flex-col gap-4">
-          {items.map((item, index) => (
-            <div
-              key={`${item.productId}-${index}`}
-              className="flex items-center gap-4"
-            >
-              <img
-                src={item.image}
-                alt={item.title}
-                className="h-16 w-16 rounded-lg object-cover border border-gray-100"
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-800">
-                  {item.title}
-                </p>
-                <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+          {items.map((item, index) => {
+            const returnInfo = getReturnInfo(item);
+            return (
+              <div
+                key={`${item.productId}-${index}`}
+                className="flex items-center gap-4"
+              >
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  className="h-16 w-16 rounded-lg object-cover border border-gray-100"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800">
+                    {item.title}
+                  </p>
+                  <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+
+                  {returnInfo.badge === "Pending" && (
+                    <Badge label="Return Requested" variant="warning" />
+                  )}
+                  {returnInfo.badge === "Approved" && (
+                    <Badge label="Return Approved" variant="success" />
+                  )}
+                  {returnInfo.badge === "Rejected" && (
+                    <p className="text-xs text-red-500 mt-0.5">
+                      Previous return request rejected
+                    </p>
+                  )}
+                  {returnInfo.eligible && (
+                    <div className="mt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setReturnModalItem({
+                            itemId: item.itemId,
+                            title: item.title,
+                          })
+                        }
+                      >
+                        Request Return
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <p className="text-sm font-medium text-gray-900">
+                    ₹
+                    {(Number(item.price) * item.quantity).toLocaleString(
+                      "en-IN",
+                    )}
+                  </p>
+                  {item.fulfillmentStatus && (
+                    <Badge
+                      label={item.fulfillmentStatus}
+                      variant={FULFILLMENT_VARIANTS[item.fulfillmentStatus]}
+                    />
+                  )}
+                </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <p className="text-sm font-medium text-gray-900">
-                  ₹
-                  {(Number(item.price) * item.quantity).toLocaleString("en-IN")}
-                </p>
-                {item.fulfillmentStatus && (
-                  <Badge
-                    label={item.fulfillmentStatus}
-                    variant={FULFILLMENT_VARIANTS[item.fulfillmentStatus]}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {deliveredSellers.length > 0 && (
@@ -322,6 +384,14 @@ const OrderDetail = () => {
         onClose={() => setRateModalOpen(false)}
         sellerId={ratingSeller?.id}
         sellerName={ratingSeller?.name}
+      />
+
+      <RequestReturnModal
+        isOpen={!!returnModalItem}
+        onClose={() => setReturnModalItem(null)}
+        orderItemId={returnModalItem?.itemId}
+        productTitle={returnModalItem?.title}
+        onSuccess={() => dispatch(fetchSingleOrder(id))}
       />
     </div>
   );

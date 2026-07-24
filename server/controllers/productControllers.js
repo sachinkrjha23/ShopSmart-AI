@@ -5,7 +5,7 @@ import database from "../database/db.js";
 import { getAIRecommendation } from "../utils/getAIRecommendation.js";
 const isValidUUID = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
+import { logAdminActivity } from "../utils/adminActivityLogger.js";
 export const createProduct = catchAsyncErrors(async (req, res, next) => {
   const { name, description, price, category, stock } = req.body;
   const created_by = req.user.id;
@@ -459,6 +459,14 @@ export const deleteProduct = catchAsyncErrors(async (req, res, next) => {
   );
 
   const resultProduct = updated.rows[0];
+
+  await logAdminActivity({
+    adminId: req.user.id,
+    actionType: resultProduct.is_active ? "product_reactivated" : "product_deactivated",
+    entityType: "product",
+    entityId: productId,
+    details: { name: resultProduct.name },
+  });
 
   res.status(200).json({
     success: true,
@@ -1142,6 +1150,14 @@ export const adminDeleteReview = catchAsyncErrors(async (req, res, next) => {
     newAvgRating,
     productId,
   ]);
+
+  await logAdminActivity({
+    adminId: req.user.id,
+    actionType: "review_deleted",
+    entityType: "review",
+    entityId: reviewId,
+    details: { productId, rating: review.rows[0].rating },
+  });
 
   res.status(200).json({
     success: true,

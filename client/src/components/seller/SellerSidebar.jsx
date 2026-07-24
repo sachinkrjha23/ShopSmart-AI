@@ -5,6 +5,7 @@ const links = [
   { to: '/seller/products', label: 'Products' },
   { to: '/seller/orders', label: 'Orders' },
   { to: '/seller/coupons', label: 'Coupons' },
+  { to: '/seller/returns', label: 'Returns' },
 ]
 
 const SellerSidebar = () => {
