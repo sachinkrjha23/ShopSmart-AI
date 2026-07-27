@@ -106,7 +106,7 @@ const Products = () => {
               </svg>
               Filters
               {activeFilterCount() > 0 && (
-                <span className="ml-1 bg-indigo-600 text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center">
+                <span className="ml-1 bg-teal-600 text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center">
                   {activeFilterCount()}
                 </span>
               )}
@@ -114,20 +114,20 @@ const Products = () => {
 
             <div className="hidden sm:flex items-center gap-2 flex-wrap">
               {filters.category && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full">
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-teal-50 text-teal-700 text-xs font-medium rounded-full">
                   {filters.category}
                   <button
                     onClick={() =>
                       dispatch(setFilters({ ...filters, category: "" }))
                     }
-                    className="hover:text-indigo-900"
+                    className="hover:text-teal-900"
                   >
                     ×
                   </button>
                 </span>
               )}
               {filters.minPrice && filters.maxPrice && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full">
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-teal-50 text-teal-700 text-xs font-medium rounded-full">
                   ₹{filters.minPrice} - ₹{filters.maxPrice}
                   <button
                     onClick={() =>
@@ -135,27 +135,27 @@ const Products = () => {
                         setFilters({ ...filters, minPrice: "", maxPrice: "" }),
                       )
                     }
-                    className="hover:text-indigo-900"
+                    className="hover:text-teal-900"
                   >
                     ×
                   </button>
                 </span>
               )}
               {filters.rating && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full">
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-teal-50 text-teal-700 text-xs font-medium rounded-full">
                   {filters.rating}★ & above
                   <button
                     onClick={() =>
                       dispatch(setFilters({ ...filters, rating: "" }))
                     }
-                    className="hover:text-indigo-900"
+                    className="hover:text-teal-900"
                   >
                     ×
                   </button>
                 </span>
               )}
               {filters.availability && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full">
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-teal-50 text-teal-700 text-xs font-medium rounded-full">
                   {filters.availability === "in-stock"
                     ? "In Stock"
                     : filters.availability === "limited"
@@ -165,7 +165,7 @@ const Products = () => {
                     onClick={() =>
                       dispatch(setFilters({ ...filters, availability: "" }))
                     }
-                    className="hover:text-indigo-900"
+                    className="hover:text-teal-900"
                   >
                     ×
                   </button>

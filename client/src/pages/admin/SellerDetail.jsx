@@ -11,7 +11,7 @@ import {
 } from '../../store/slices/sellerSlice'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import Loader from '../../components/ui/Loader'
+import DetailPageSkeleton from "../../components/ui/DetailPageSkeleton";
 
 const STATUS_VARIANTS = {
   Pending: 'default',
@@ -68,11 +68,7 @@ const SellerDetail = () => {
   }
 
   if (loading && !seller) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader />
-      </div>
-    )
+    return <DetailPageSkeleton />
   }
 
   if (!seller) return null
@@ -163,7 +159,7 @@ const SellerDetail = () => {
             onChange={(e) => setReason(e.target.value)}
             placeholder={`Reason for ${action === 'reject' ? 'rejecting' : 'suspending'} (shown to the seller)...`}
             rows={3}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
           <div className="flex gap-3">
             <Button variant="danger" onClick={handleConfirmAction} disabled={submitting}>

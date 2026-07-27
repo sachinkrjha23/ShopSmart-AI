@@ -16,7 +16,7 @@ const AdminNavbar = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100 h-16 flex items-center justify-between px-6">
-      <Link to="/" className="text-base font-semibold text-gray-700   hover:text-indigo-600 transition-colors">
+      <Link to="/" className="text-base font-semibold text-gray-700   hover:text-teal-600 transition-colors">
         ← Back to Store
       </Link>
 
@@ -25,7 +25,7 @@ const AdminNavbar = () => {
           {user?.avatar?.url ? (
             <img src={user.avatar.url} alt={user.name} className="h-8 w-8 rounded-full object-cover" />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-semibold">
+            <div className="h-8 w-8 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-xs font-semibold">
               {user?.name?.charAt(0).toUpperCase() || '?'}
             </div>
           )}

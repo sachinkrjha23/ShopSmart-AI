@@ -1236,6 +1236,32 @@ export const adminInitiateRefund = catchAsyncErrors(async (req, res, next) => {
       );
     }
 
+    const paymentInfo = await razorpay.payments.fetch(razorpay_payment_id);
+    const alreadyRefundedAmount = Number(paymentInfo.amount_refunded || 0) / 100;
+
+    if (alreadyRefundedAmount > 0) {
+      await client.query(
+        `UPDATE payments SET payment_status = 'Refunded', updated_at = CURRENT_TIMESTAMP WHERE order_id = $1`,
+        [orderId],
+      );
+      await client.query("COMMIT");
+
+      await createPersonalNotification({
+        userId: buyer_id,
+        type: "order_refunded",
+        title: "Refund issued",
+        message: `A refund of ₹${alreadyRefundedAmount.toLocaleString("en-IN")} has been issued for order #${orderId.slice(0, 8).toUpperCase()}.`,
+        linkEntityType: "order",
+        linkEntityId: orderId,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "This order was already refunded — records have been updated to match.",
+        amount: alreadyRefundedAmount.toFixed(2),
+      });
+    }
+
     const refundAmountPaise = amount ? toPaise(amount) : toPaise(total_price);
 
     const refund = await razorpay.payments.refund(razorpay_payment_id, {

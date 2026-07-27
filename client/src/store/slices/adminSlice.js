@@ -22,9 +22,9 @@ export const fetchDashboardStats = createAsyncThunk(
 
 export const fetchAllUsers = createAsyncThunk(
   "admin/fetchAllUsers",
-  async (page = 1, { rejectWithValue }) => {
+  async ({ page = 1, role = 'User' } = {}, { rejectWithValue }) => {
     try {
-      const res = await getAllUsers(page);
+      const res = await getAllUsers(page, role);
       return res.data;
     } catch (err) {
       return rejectWithValue(

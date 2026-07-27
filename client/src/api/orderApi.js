@@ -26,3 +26,5 @@ export const downloadInvoice = (orderId) =>
 export const updateAdminItemFulfillmentStatus = (itemId, status) =>
   axiosInstance.put(`/api/v1/payment/admin/order-item/${itemId}/fulfillment-status`, { status })
 
+export const adminRefundOrder = (orderId, amount) =>
+  axiosInstance.post('/api/v1/payment/admin/refund', { orderId, amount })

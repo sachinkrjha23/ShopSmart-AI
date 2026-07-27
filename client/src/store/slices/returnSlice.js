@@ -5,6 +5,8 @@ import {
   resolveAdminReturn as resolveAdminReturnApi,
   getSellerReturns,
   resolveSellerReturn as resolveSellerReturnApi,
+  retryAdminReturnRefund as retryAdminReturnRefundApi,
+  retrySellerReturnRefund as retrySellerReturnRefundApi,
 } from "../../api/returnApi";
 
 export const requestReturn = createAsyncThunk(
@@ -77,6 +79,34 @@ export const resolveSellerReturn = createAsyncThunk(
   },
 );
 
+export const retryAdminRefund = createAsyncThunk(
+  "returns/retryAdminRefund",
+  async (returnId, { rejectWithValue }) => {
+    try {
+      const res = await retryAdminReturnRefundApi(returnId);
+      return { ...res.data, returnId };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to issue refund",
+      );
+    }
+  },
+);
+
+export const retrySellerRefund = createAsyncThunk(
+  "returns/retrySellerRefund",
+  async (returnId, { rejectWithValue }) => {
+    try {
+      const res = await retrySellerReturnRefundApi(returnId);
+      return { ...res.data, returnId };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to issue refund",
+      );
+    }
+  },
+);
+
 const initialState = {
   loading: false,
   error: null,
@@ -124,10 +154,14 @@ const returnSlice = createSlice({
 
     builder
       .addCase(resolveAdminReturn.fulfilled, (state, action) => {
-        const { returnId, action: resolvedAction } = action.payload;
+        const { returnId, action: resolvedAction, refundAmount } = action.payload;
         state.adminReturns = state.adminReturns.map((rr) =>
           rr.id === returnId
-            ? { ...rr, status: resolvedAction === "Approve" ? "Approved" : "Rejected" }
+            ? {
+                ...rr,
+                status: resolvedAction === "Approve" ? "Approved" : "Rejected",
+                refund_amount: refundAmount ?? rr.refund_amount,
+              }
             : rr,
         );
       })
@@ -151,14 +185,40 @@ const returnSlice = createSlice({
 
     builder
       .addCase(resolveSellerReturn.fulfilled, (state, action) => {
-        const { returnId, action: resolvedAction } = action.payload;
+        const { returnId, action: resolvedAction, refundAmount } = action.payload;
         state.sellerReturns = state.sellerReturns.map((rr) =>
           rr.id === returnId
-            ? { ...rr, status: resolvedAction === "Approve" ? "Approved" : "Rejected" }
+            ? {
+                ...rr,
+                status: resolvedAction === "Approve" ? "Approved" : "Rejected",
+                refund_amount: refundAmount ?? rr.refund_amount,
+              }
             : rr,
         );
       })
       .addCase(resolveSellerReturn.rejected, (state, action) => {
+        state.error = action.payload;
+      });
+
+    builder
+      .addCase(retryAdminRefund.fulfilled, (state, action) => {
+        const { returnId, refundAmount } = action.payload;
+        state.adminReturns = state.adminReturns.map((rr) =>
+          rr.id === returnId ? { ...rr, refund_amount: refundAmount } : rr,
+        );
+      })
+      .addCase(retryAdminRefund.rejected, (state, action) => {
+        state.error = action.payload;
+      });
+
+    builder
+      .addCase(retrySellerRefund.fulfilled, (state, action) => {
+        const { returnId, refundAmount } = action.payload;
+        state.sellerReturns = state.sellerReturns.map((rr) =>
+          rr.id === returnId ? { ...rr, refund_amount: refundAmount } : rr,
+        );
+      })
+      .addCase(retrySellerRefund.rejected, (state, action) => {
         state.error = action.payload;
       });
   },

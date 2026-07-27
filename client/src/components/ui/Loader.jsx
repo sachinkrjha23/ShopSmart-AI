@@ -7,7 +7,7 @@ const Loader = ({ size = 'md', fullScreen = false }) => {
 
   const spinner = (
     <div
-      className={`${sizes[size]} border-indigo-600 border-t-transparent rounded-full animate-spin`}
+      className={`${sizes[size]} border-teal-600 border-t-transparent rounded-full animate-spin`}
     />
   )
 

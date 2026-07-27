@@ -2,7 +2,8 @@ import axiosInstance from '../lib/axios'
 
 export const getDashboardStats = () => axiosInstance.get('/api/v1/admin/fetch/dashboard-stats')
 
-export const getAllUsers = (page = 1) => axiosInstance.get(`/api/v1/admin/getallusers?page=${page}`)
+export const getAllUsers = (page = 1, role = 'User') =>
+  axiosInstance.get(`/api/v1/admin/getallusers?page=${page}&role=${role}`)
 
 export const deleteUser = (id, adminSecret) =>
   axiosInstance.delete(`/api/v1/admin/delete/${id}`, { data: { adminSecret } });

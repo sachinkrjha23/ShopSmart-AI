@@ -8,10 +8,11 @@ import { logAdminActivity } from "../utils/adminActivityLogger.js";
 
 export const getAllUsers = catchAsyncErrors(async (req, res, next) => {
   const page = parseInt(req.query.page) || 1;
+  const role = req.query.role === "Admin" ? "Admin" : "User";
 
   const totalUsersResult = await database.query(
     "SELECT COUNT(*) FROM users WHERE role = $1 AND is_deleted = FALSE",
-    ["User"],
+    [role],
   );
 
   const totalUsers = parseInt(totalUsersResult.rows[0].count);
@@ -20,7 +21,7 @@ export const getAllUsers = catchAsyncErrors(async (req, res, next) => {
 
   const users = await database.query(
     "SELECT * FROM users WHERE role = $1 AND is_deleted = FALSE ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-    ["User", 10, offset],
+    [role, 10, offset],
   );
 
   const safeUsers = users.rows.map(({ password, ...safeUser }) => safeUser);

@@ -25,7 +25,7 @@ const FeaturedProducts = () => {
             </div>
             <Link
               to="/products"
-              className="hidden sm:inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+              className="hidden sm:inline-flex items-center gap-2 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors"
             >
               View All
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -54,7 +54,7 @@ const FeaturedProducts = () => {
             </div>
             <Link
               to="/products?ratings=4.5"
-              className="hidden sm:inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+              className="hidden sm:inline-flex items-center gap-2 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors"
             >
               View All
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -77,7 +77,7 @@ const AddressSelector = () => {
               onClick={() => handleSelect(addr)}
               className={`p-3 border rounded-lg cursor-pointer transition-colors ${
                 selectedAddress?.id === addr.id
-                  ? "border-indigo-500 bg-indigo-50"
+                  ? "border-teal-500 bg-teal-50"
                   : "border-gray-200 hover:border-gray-300"
               }`}
             >
@@ -88,7 +88,7 @@ const AddressSelector = () => {
                       {addr.full_name}
                     </span>
                     {addr.is_default && (
-                      <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">
+                      <span className="text-xs bg-teal-100 text-teal-600 px-2 py-0.5 rounded-full">
                         Default
                       </span>
                     )}
@@ -104,7 +104,7 @@ const AddressSelector = () => {
                 {!addr.is_default && (
                   <button
                     onClick={(e) => handleSetDefault(e, addr.id)}
-                    className="text-indigo-600 hover:underline"
+                    className="text-teal-600 hover:underline"
                   >
                     Set as Default
                   </button>
@@ -143,7 +143,7 @@ const AddressSelector = () => {
         addresses.length < 5 && (
           <button
             onClick={() => setShowForm(true)}
-            className="text-sm text-indigo-600 hover:underline"
+            className="text-sm text-teal-600 hover:underline"
           >
             + Add New Address
           </button>

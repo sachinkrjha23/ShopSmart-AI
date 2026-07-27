@@ -69,7 +69,7 @@ const LoginModal = () => {
           <Link
             to="/forgot-password"
             onClick={() => dispatch(closeLoginModal())}
-            className="text-xs text-indigo-600 hover:underline"
+            className="text-xs text-teal-600 hover:underline"
           >
             Forgot password?
           </Link>
@@ -95,7 +95,7 @@ const LoginModal = () => {
           <button
             type="button"
             onClick={switchToRegister}
-            className="text-indigo-600 font-medium hover:underline"
+            className="text-teal-600 font-medium hover:underline"
           >
             Register
           </button>

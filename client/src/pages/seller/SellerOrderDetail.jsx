@@ -5,7 +5,7 @@ import { toast } from 'react-hot-toast'
 import { fetchSellerOrderDetail, updateItemFulfillmentStatus, clearSellerOrderDetail, cancelSellerItem } from '../../store/slices/sellerSlice'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
-import Loader from '../../components/ui/Loader'
+import DetailPageSkeleton from "../../components/ui/DetailPageSkeleton";
 import Tooltip from '../../components/ui/Tooltip'
 
 const STATUS_VARIANTS = {
@@ -73,11 +73,7 @@ const SellerOrderDetail = () => {
   }
 
   if (loading && !order) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <Loader />
-      </div>
-    )
+    return <DetailPageSkeleton />;
   }
 
   if (!order) {
@@ -106,7 +102,7 @@ const SellerOrderDetail = () => {
               <button
                 type="button"
                 onClick={handleCopyId}
-                className="text-sm font-medium text-gray-800 hover:text-indigo-600 transition-colors"
+                className="text-sm font-medium text-gray-800 hover:text-teal-600 transition-colors"
               >
                 #{order.id.slice(0, 8).toUpperCase()}
               </button>
@@ -174,7 +170,7 @@ const SellerOrderDetail = () => {
                     onChange={(e) => setCancelReason(e.target.value)}
                     placeholder="Reason for cancelling (shown to the buyer)..."
                     rows={2}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                   <div className="flex gap-2">
                     <Button variant="danger" onClick={() => handleConfirmCancel(item.id)} disabled={cancelling}>

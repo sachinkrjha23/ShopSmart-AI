@@ -60,7 +60,7 @@ const WishlistCard = ({ item }) => {
 
       <div className="flex-1 flex flex-col">
         <Link to={`/products/${item.product_id}`}>
-          <h3 className="text-sm font-medium text-gray-800 hover:text-indigo-600 transition-colors line-clamp-2">
+          <h3 className="text-sm font-medium text-gray-800 hover:text-teal-600 transition-colors line-clamp-2">
             {item.name}
           </h3>
         </Link>
@@ -76,7 +76,7 @@ const WishlistCard = ({ item }) => {
         </div>
 
         <div className="flex items-center justify-between mt-auto pt-2">
-          <span className="text-base font-bold text-indigo-600">
+          <span className="text-base font-bold text-teal-600">
             {formatPrice(item.price)}
           </span>
           {!isInStock && (

@@ -28,7 +28,7 @@ const Profile = () => {
             <Link
               key={link.to}
               to={link.to}
-              className="bg-white rounded-xl border border-gray-100 p-4 hover:border-indigo-200 hover:shadow-sm transition-all"
+              className="bg-white rounded-xl border border-gray-100 p-4 hover:border-teal-200 hover:shadow-sm transition-all"
             >
               <p className="text-sm font-semibold text-gray-800">{link.label}</p>
               <p className="text-xs text-gray-500 mt-1">{link.description}</p>

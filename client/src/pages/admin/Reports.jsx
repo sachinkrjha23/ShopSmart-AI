@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchAdminReports, resolveReportThunk } from '../../store/slices/reportSlice'
-import Loader from '../../components/ui/Loader'
+import TableSkeleton from '../../components/ui/TableSkeleton'
 import Badge from '../../components/ui/Badge'
 import Pagination from '../../components/ui/Pagination'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
 import { toast } from 'react-hot-toast'
+import { Link } from 'react-router-dom'
 
 const STATUS_VARIANTS = {
   Pending: 'warning',
@@ -93,7 +94,7 @@ const Reports = () => {
             name="status"
             value={filters.status}
             onChange={handleFilterChange}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-teal-500"
           >
             <option value="">All statuses</option>
             <option value="Pending">Pending</option>
@@ -108,7 +109,7 @@ const Reports = () => {
             name="entityType"
             value={filters.entityType}
             onChange={handleFilterChange}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-teal-500"
           >
             <option value="">All entities</option>
             {ENTITY_TYPES.map((type) => (
@@ -120,7 +121,7 @@ const Reports = () => {
         <button
           type="button"
           onClick={applyFilters}
-          className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
+          className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700"
         >
           Apply
         </button>
@@ -134,9 +135,7 @@ const Reports = () => {
       </div>
 
       {loading && adminReports.length === 0 ? (
-        <div className="flex justify-center py-10">
-          <Loader />
-        </div>
+        <TableSkeleton columns={6} />
       ) : adminReports.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
           No reports found.
@@ -160,6 +159,11 @@ const Reports = () => {
                   <td className="px-4 py-3 text-gray-700">
                     <span className="block font-medium">{r.entity_label || <span className="italic text-gray-400">Deleted {r.entity_type}</span>}</span>
                     <span className="block text-xs text-gray-400 capitalize">{r.entity_type}</span>
+                    {r.entity_type === 'seller' && r.entity_label && (
+                      <Link to={`/admin/sellers/${r.entity_id}`} className="text-xs text-teal-600 hover:underline">
+                        View Seller →
+                      </Link>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-600 max-w-xs">
                     <span className="block">{r.reason}</span>
@@ -228,7 +232,7 @@ const Reports = () => {
               value={resolutionNotes}
               onChange={(e) => setResolutionNotes(e.target.value)}
               rows={3}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-teal-500 resize-none"
               placeholder={
                 resolveTarget?.status === 'Resolved'
                   ? "e.g. We've contacted the seller about this and it will be resolved within 3 business days. Thank you for letting us know."

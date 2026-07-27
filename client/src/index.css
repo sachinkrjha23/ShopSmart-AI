@@ -1,19 +1,19 @@
-/* src/index.css */
 @import "tailwindcss";
 
 /* Custom base styles */
 @layer base {
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
   }
 
   body {
-    @apply antialiased text-gray-900 bg-white;
+    @apply antialiased text-gray-900 bg-white overflow-x-hidden;
   }
 
   /* Focus styles for better accessibility */
   *:focus-visible {
-    @apply outline-2 outline-offset-2 outline-indigo-500;
+    @apply outline-2 outline-offset-2 outline-teal-500;
   }
 }
 
@@ -31,6 +31,21 @@
     -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 37%, #e5e7eb 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }
 

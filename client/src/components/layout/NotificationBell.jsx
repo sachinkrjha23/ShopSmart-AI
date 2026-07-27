@@ -54,7 +54,7 @@ const NotificationBell = () => {
     <div className="relative" ref={wrapperRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative text-gray-600 hover:text-indigo-600 transition-colors"
+        className="relative text-gray-600 hover:text-teal-600 transition-colors"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" />
@@ -95,7 +95,7 @@ const NotificationBell = () => {
               setIsOpen(false)
               navigate('/notifications')
             }}
-            className="w-full text-center py-2.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition-colors border-t border-gray-100"
+            className="w-full text-center py-2.5 text-sm font-medium text-teal-600 hover:bg-teal-50 transition-colors border-t border-gray-100"
           >
             View all
           </button>

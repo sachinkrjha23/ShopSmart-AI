@@ -5,7 +5,7 @@ import { toast } from 'react-hot-toast'
 import { fetchSellerOrders } from '../../store/slices/sellerSlice'
 import Badge from '../../components/ui/Badge'
 import Pagination from '../../components/ui/Pagination'
-import Loader from '../../components/ui/Loader'
+import TableSkeleton from '../../components/ui/TableSkeleton'
 import Tooltip from '../../components/ui/Tooltip'
 
 const STATUS_VARIANTS = {
@@ -38,9 +38,7 @@ const SellerOrders = () => {
       <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
 
       {loading && sellerOrders.length === 0 ? (
-        <div className="flex justify-center py-10">
-          <Loader />
-        </div>
+        <TableSkeleton columns={5} />
       ) : sellerOrders.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
           No orders yet.
@@ -63,14 +61,14 @@ const SellerOrders = () => {
                 <tr key={order.id} className="border-t border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <Link to={`/seller/orders/${order.id}`} className="font-medium text-indigo-600 hover:underline">
+                      <Link to={`/seller/orders/${order.id}`} className="font-medium text-teal-600 hover:underline">
                         #{order.id.slice(0, 8).toUpperCase()}
                       </Link>
                       <Tooltip text={order.id}>
                         <button
                           type="button"
                           onClick={(e) => handleCopyId(e, order.id)}
-                          className="text-gray-300 hover:text-indigo-600 transition-colors"
+                          className="text-gray-300 hover:text-teal-600 transition-colors"
                         >
                           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />

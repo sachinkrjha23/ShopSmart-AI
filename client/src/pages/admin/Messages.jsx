@@ -77,7 +77,7 @@ const AdminMessages = () => {
                     <button
                       type="button"
                       onClick={() => handleCopyId(msg.id)}
-                      className="text-xs text-gray-400 hover:text-indigo-600 transition-colors mt-0.5"
+                      className="text-xs text-gray-400 hover:text-teal-600 transition-colors mt-0.5"
                     >
                       #{msg.id.slice(0, 8).toUpperCase()}
                     </button>

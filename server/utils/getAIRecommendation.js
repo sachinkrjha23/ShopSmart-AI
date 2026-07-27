@@ -6,7 +6,7 @@ export async function getAIRecommendation(userPrompt, products) {
     return { success: false, products: [], error: "API key missing" };
   }
 
-  const URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+  const URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
 
   const limitedProducts = products.slice(0, 50).map((p) => ({
     id: p.id,
@@ -58,11 +58,11 @@ export async function getAIRecommendation(userPrompt, products) {
 
       Scenario 2: User asks for "camera"
       - Available: "S24 Ultra" (phone with camera), "season bat" (cricket bat)
-      - Result: ["S24 Ultra"] (it has a camera)
+      - Result: ["<S24 Ultra's id>"] (it has a camera)
 
       Scenario 3: User asks for "bat"
       - Available: "S24 Ultra" (phone), "season bat" (cricket bat)
-      - Result: ["season bat"] (it's a bat)
+      - Result: ["<season bat's id>"] (it's a bat)
 
       Scenario 4: User asks for "beyblade"
       - Available: "S24 Ultra" (phone), "season bat" (cricket bat)
@@ -70,7 +70,7 @@ export async function getAIRecommendation(userPrompt, products) {
 
       Scenario 5: User asks for "phone"
       - Available: "S24 Ultra" (phone), "season bat" (cricket bat)
-      - Result: ["S24 Ultra"] (it's a phone)
+      - Result: ["<S24 Ultra's id>"] (it's a phone)
 
       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       KEY PRINCIPLES:
@@ -83,10 +83,10 @@ export async function getAIRecommendation(userPrompt, products) {
       5. Only return products that match the EXACT type requested
       6. If in doubt, EXCLUDE the product
 
-      RESPONSE FORMAT:
+      RESPONSE FORMAT — respond with ONLY a JSON array of matching product IDs, nothing else:
       []  ← If NO products match
       OR
-      [{"id":"...","name":"...", ...}]  ← Only matching products
+      ["<id1>", "<id2>"]  ← IDs of only the matching products, most relevant first
       `;
 
       console.log(
@@ -101,6 +101,9 @@ export async function getAIRecommendation(userPrompt, products) {
           generationConfig: {
             temperature: 0.1,
             maxOutputTokens: 2000,
+            thinkingConfig: {
+              thinkingBudget: 0,
+            },
           },
         }),
       });
@@ -140,15 +143,19 @@ export async function getAIRecommendation(userPrompt, products) {
         cleanedText = jsonMatch[0];
       }
 
-      let parsedProducts;
-        try {
-        parsedProducts = JSON.parse(cleanedText);
+      let matchedIds;
+      try {
+        matchedIds = JSON.parse(cleanedText);
 
-        if (!Array.isArray(parsedProducts)) {
-          parsedProducts = [parsedProducts];
+        if (!Array.isArray(matchedIds)) {
+          matchedIds = [matchedIds];
         }
 
-        parsedProducts = parsedProducts.filter((p) => p && p.id && p.name);
+        // AI now returns IDs only — reconstruct full product objects from data
+        // we already fetched, instead of trusting AI to echo back full data
+        // (which was large enough with image arrays to get truncated).
+        const idSet = new Set(matchedIds.map((id) => String(id)));
+        const parsedProducts = limitedProducts.filter((p) => idSet.has(String(p.id)));
 
         console.log(`✅ AI matched ${parsedProducts.length} products`);
         return { success: true, products: parsedProducts };

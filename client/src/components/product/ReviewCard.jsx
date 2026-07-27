@@ -21,7 +21,7 @@ const ReviewCard = ({ review }) => {
             onError={(e) => { e.target.style.display = 'none' }}
           />
         ) : (
-          <div className="h-9 w-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-semibold shrink-0">
+          <div className="h-9 w-9 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-sm font-semibold shrink-0">
             {initial}
           </div>
         )}

@@ -12,8 +12,8 @@ export const createProduct = (data) =>
 export const updateProduct = (id, data) => 
   axiosInstance.put(`/api/v1/product/admin/update/${id}`, data)
 
-export const deleteProduct = (id) => 
-  axiosInstance.delete(`/api/v1/product/admin/delete/${id}`)
+export const deleteProduct = (id, reason) =>
+  axiosInstance.delete(`/api/v1/product/admin/delete/${id}`, { data: { reason } })
 
 export const postReview = (productId, data) => 
   axiosInstance.put(`/api/v1/product/post-new/review/${productId}`, data)
@@ -44,3 +44,6 @@ export const deleteAdminReview = (reviewId) =>
 
 export const checkProductsAvailability = (productIds) =>
   axiosInstance.post('/api/v1/product/check-availability', { productIds })
+
+export const polishProductDescription = (data) =>
+  axiosInstance.post('/api/v1/product/ai/polish-description', data)

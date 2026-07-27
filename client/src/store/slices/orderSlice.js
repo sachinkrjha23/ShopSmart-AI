@@ -9,6 +9,7 @@ import {
   updateOrderStatus as updateOrderStatusApi,
   adminCancelOrder as adminCancelOrderApi,
   updateAdminItemFulfillmentStatus as updateAdminItemFulfillmentStatusApi,
+  adminRefundOrder as adminRefundOrderApi,
 } from "../../api/orderApi";
 
 export const createOrder = createAsyncThunk(
@@ -132,6 +133,20 @@ export const updateAdminItemFulfillmentStatus = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || "Failed to update item status",
+      );
+    }
+  },
+);
+
+export const refundAdminOrder = createAsyncThunk(
+  "order/refundAdminOrder",
+  async ({ orderId, amount }, { rejectWithValue }) => {
+    try {
+      const res = await adminRefundOrderApi(orderId, amount);
+      return { ...res.data, orderId };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to issue refund",
       );
     }
   },

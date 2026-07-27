@@ -38,7 +38,7 @@ const SearchResults = () => {
         </h2>
         <Link
           to="/products"
-          className="text-indigo-600 hover:underline text-sm"
+          className="text-teal-600 hover:underline text-sm"
         >
           Browse all products
         </Link>
@@ -53,7 +53,7 @@ const SearchResults = () => {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
             Search results for{" "}
-            <span className="text-indigo-600">"{query}"</span>
+            <span className="text-teal-600">"{query}"</span>
           </h1>
           {!loading && (
             <p className="text-sm text-gray-500 mt-1">

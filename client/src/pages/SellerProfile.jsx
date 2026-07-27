@@ -8,7 +8,7 @@ import {
 import { fetchProducts, clearProducts } from "../store/slices/productSlice";
 import ProductGrid from "../components/product/ProductGrid";
 import Pagination from "../components/ui/Pagination";
-import Loader from "../components/ui/Loader";
+import DetailPageSkeleton from "../components/ui/DetailPageSkeleton";
 import Button from "../components/ui/Button";
 import ReportButton from "../components/report/ReportButton";
 
@@ -47,11 +47,7 @@ const SellerProfile = () => {
   }, [dispatch, sellerId, page, seller]);
 
   if (sellerLoading && !seller) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <Loader />
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!seller) {
@@ -73,7 +69,7 @@ const SellerProfile = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col gap-8">
       <div className="bg-white rounded-xl border border-gray-100 p-6 flex items-start gap-4">
-        <div className="w-16 h-16 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-2xl font-bold shrink-0">
+        <div className="w-16 h-16 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-2xl font-bold shrink-0">
           {seller.store_name?.[0]?.toUpperCase() || "S"}
         </div>
         <div>

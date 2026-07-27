@@ -5,7 +5,7 @@ const Badge = ({ label, variant = 'default' }) => {
     warning: 'bg-yellow-100 text-yellow-700',
     danger: 'bg-red-100 text-red-700',
     info: 'bg-blue-100 text-blue-700',
-    new: 'bg-indigo-100 text-indigo-700',
+    new: 'bg-teal-100 text-teal-700',
   }
 
   return (

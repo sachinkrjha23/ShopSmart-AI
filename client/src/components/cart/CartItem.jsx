@@ -44,7 +44,7 @@ const CartItem = ({ item }) => {
 
       <div className="flex-1 min-w-0">
         <Link to={`/products/${item.productId}`}>
-          <h3 className="text-sm font-medium text-gray-800 hover:text-indigo-600 transition-colors line-clamp-2">
+          <h3 className="text-sm font-medium text-gray-800 hover:text-teal-600 transition-colors line-clamp-2">
             {item.name}
           </h3>
         </Link>

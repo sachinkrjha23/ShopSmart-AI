@@ -12,7 +12,7 @@ import OrderTimeline from "../components/order/OrderTimeline";
 import Badge from "../components/ui/Badge";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Button from "../components/ui/Button";
-import Loader from "../components/ui/Loader";
+import DetailPageSkeleton from "../components/ui/DetailPageSkeleton";
 import { downloadInvoice } from "../api/orderApi";
 import RateSellerModal from "../components/order/RateSellerModal";
 import RequestReturnModal from "../components/order/RequestReturnModal";
@@ -35,9 +35,7 @@ const FULFILLMENT_VARIANTS = {
 
 const RETURN_WINDOW_DAYS = 7;
 
-// Mirrors the backend's eligibility check in createReturnRequest — kept here
-// only for UI display (button visibility). The server re-validates everything
-// independently at request time, this is not a source of truth.
+
 const getReturnInfo = (item) => {
   if (item.returnStatus === "Pending")
     return { eligible: false, badge: "Pending" };
@@ -105,11 +103,7 @@ const OrderDetail = () => {
   };
 
   if (loading && !order) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <Loader />
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!order) {
@@ -272,7 +266,7 @@ const OrderDetail = () => {
                   setRatingSeller(seller);
                   setRateModalOpen(true);
                 }}
-                className="text-sm text-indigo-600 hover:underline"
+                className="text-sm text-teal-600 hover:underline"
               >
                 ★ Rate {seller.name}
               </button>

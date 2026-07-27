@@ -14,3 +14,9 @@ export const getSellerReturns = (params) =>
 
 export const resolveSellerReturn = (returnId, data) =>
   axiosInstance.patch(`/api/v1/return/seller/${returnId}`, data)
+
+export const retryAdminReturnRefund = (returnId) =>
+  axiosInstance.post(`/api/v1/return/admin/${returnId}/refund`)
+
+export const retrySellerReturnRefund = (returnId) =>
+  axiosInstance.post(`/api/v1/return/seller/${returnId}/refund`)

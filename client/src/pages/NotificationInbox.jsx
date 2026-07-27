@@ -23,13 +23,13 @@ const NotificationInbox = () => {
         <div className="flex gap-2 text-sm font-medium">
           <button
             onClick={() => setShowRead(false)}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${!showRead ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`px-3 py-1.5 rounded-lg transition-colors ${!showRead ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
             Unread
           </button>
           <button
             onClick={() => setShowRead(true)}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${showRead ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`px-3 py-1.5 rounded-lg transition-colors ${showRead ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
             All
           </button>
@@ -45,7 +45,7 @@ const NotificationInbox = () => {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className={`p-4 rounded-xl border ${n.read_at ? 'bg-white border-gray-100' : 'bg-indigo-50 border-indigo-100'}`}
+              className={`p-4 rounded-xl border ${n.read_at ? 'bg-white border-gray-100' : 'bg-teal-50 border-teal-100'}`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
@@ -59,7 +59,7 @@ const NotificationInbox = () => {
                   {!n.read_at && (
                     <button
                       onClick={() => dispatch(markNotificationRead(n.id))}
-                      className="text-xs font-medium text-indigo-600 hover:underline"
+                      className="text-xs font-medium text-teal-600 hover:underline"
                     >
                       Mark read
                     </button>

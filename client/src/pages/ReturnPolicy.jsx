@@ -25,7 +25,7 @@ const ReturnPolicy = () => {
           </Section>
 
           <Section title="2. How to Request a Return">
-            <p>Reach out to us via our <Link to="/contact" className="text-indigo-600 hover:underline">Contact page</Link> with your order ID and the reason for the return. Our support team will confirm eligibility and walk you through the next steps.</p>
+            <p>Reach out to us via our <Link to="/contact" className="text-teal-600 hover:underline">Contact page</Link> with your order ID and the reason for the return. Our support team will confirm eligibility and walk you through the next steps.</p>
           </Section>
 
           <Section title="3. Refunds">

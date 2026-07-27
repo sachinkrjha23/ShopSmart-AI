@@ -19,7 +19,7 @@ const AdminSidebar = () => {
   return (
     <aside className="w-56 shrink-0 bg-white border-r border-gray-100 min-h-screen p-4">
       <div className="mb-6 px-2">
-        <span className="text-lg font-bold text-indigo-600">ShopSmart</span>
+        <span className="text-lg font-bold text-teal-600">ShopSmart</span>
         <span className="block text-xs text-gray-400">Admin Panel</span>
       </div>
 
@@ -32,7 +32,7 @@ const AdminSidebar = () => {
             className={({ isActive }) =>
               `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-indigo-50 text-indigo-600'
+                  ? 'bg-teal-50 text-teal-600'
                   : 'text-gray-600 hover:bg-gray-50'
               }`
             }

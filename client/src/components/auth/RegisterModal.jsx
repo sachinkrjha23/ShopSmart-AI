@@ -87,7 +87,7 @@ const RegisterModal = () => {
             type="button"
             onClick={handleResend}
             disabled={loading}
-            className="text-xs text-indigo-600 hover:underline"
+            className="text-xs text-teal-600 hover:underline"
           >
             {loading ? "Sending..." : "Didn't get the email? Resend"}
           </button>
@@ -161,7 +161,7 @@ const RegisterModal = () => {
           <button
             type="button"
             onClick={switchToLogin}
-            className="text-indigo-600 font-medium hover:underline"
+            className="text-teal-600 font-medium hover:underline"
           >
             Login
           </button>

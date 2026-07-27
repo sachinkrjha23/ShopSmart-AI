@@ -127,7 +127,7 @@ const SellerCouponModal = ({ isOpen, onClose, coupon, onSaved }) => {
               value={formData.type}
               onChange={handleChange}
               disabled={loading}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 bg-white"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200 bg-white"
             >
               <option value="percentage">Percentage</option>
               <option value="flat">Flat Amount</option>

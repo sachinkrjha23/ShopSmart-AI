@@ -4,7 +4,7 @@ const NotFound = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="text-center max-w-md">
-        <p className="text-7xl font-bold text-indigo-600 mb-2">404</p>
+        <p className="text-7xl font-bold text-teal-600 mb-2">404</p>
         <h1 className="text-xl font-semibold text-gray-800 mb-2">
           This page took a wrong turn
         </h1>
@@ -14,7 +14,7 @@ const NotFound = () => {
         <div className="flex items-center justify-center gap-3">
           <Link
             to="/"
-            className="bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors"
+            className="bg-teal-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-teal-700 transition-colors"
           >
             Back to Home
           </Link>

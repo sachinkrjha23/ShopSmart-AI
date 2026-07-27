@@ -51,7 +51,7 @@ const CartDrawer = () => {
           <div className="p-4 border-t border-gray-100">
             <CartSummary />
             <Link to="/cart" onClick={() => dispatch(closeCartDrawer())}>
-              <button className="w-full text-center text-sm text-indigo-600 hover:underline mt-3">
+              <button className="w-full text-center text-sm text-teal-600 hover:underline mt-3">
                 View Full Cart
               </button>
             </Link>

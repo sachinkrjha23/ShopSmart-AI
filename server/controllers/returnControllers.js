@@ -6,6 +6,28 @@ import { createPersonalNotification } from "./notificationControllers.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { logAdminActivity } from "../utils/adminActivityLogger.js";
 
+const syncOrderPaymentStatusIfFullyRefunded = async (orderId) => {
+  const { rows } = await database.query(
+    `SELECT
+        COALESCE(SUM(oi.price * oi.quantity), 0) AS items_total,
+        COALESCE(SUM(rr.refund_amount) FILTER (WHERE rr.status = 'Approved'), 0) AS refunded_total
+       FROM order_items oi
+       LEFT JOIN return_requests rr ON rr.order_item_id = oi.id
+      WHERE oi.order_id = $1`,
+    [orderId],
+  );
+
+  const { items_total, refunded_total } = rows[0];
+
+  if (Number(items_total) > 0 && Number(refunded_total) >= Number(items_total)) {
+    await database.query(
+      `UPDATE payments SET payment_status = 'Refunded', updated_at = CURRENT_TIMESTAMP
+        WHERE order_id = $1 AND payment_status != 'Refunded'`,
+      [orderId],
+    );
+  }
+};
+
 const isValidUUID = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
@@ -202,6 +224,10 @@ export const resolveReturnRequestBySeller = catchAsyncErrors(async (req, res, ne
 
     await client.query("COMMIT");
 
+    if (refundInitiated) {
+      await syncOrderPaymentStatusIfFullyRefunded(rr.order_id);
+    }
+
     await createPersonalNotification({
       userId: rr.buyer_id,
       type: action === "Approve" ? "return_approved" : "return_rejected",
@@ -225,7 +251,12 @@ export const resolveReturnRequestBySeller = catchAsyncErrors(async (req, res, ne
       console.error("Failed to send return-resolution email:", error.message);
     }
 
-    res.status(200).json({ success: true, message: `Return request ${action === "Approve" ? "approved" : "rejected"}.` });
+    res.status(200).json({
+      success: true,
+      message: `Return request ${action === "Approve" ? "approved" : "rejected"}.`,
+      refundInitiated,
+      refundAmount: action === "Approve" && refundInitiated ? refundAmount : null,
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     return next(new ErrorHandler(error.message || "Failed to resolve return request.", error.statusCode || 500));
@@ -340,6 +371,10 @@ export const resolveReturnRequestByAdmin = catchAsyncErrors(async (req, res, nex
 
     await client.query("COMMIT");
 
+    if (refundInitiated) {
+      await syncOrderPaymentStatusIfFullyRefunded(rr.order_id);
+    }
+
     await logAdminActivity({
       adminId: req.user.id,
       actionType: action === "Approve" ? "return_approved" : "return_rejected",
@@ -375,11 +410,211 @@ export const resolveReturnRequestByAdmin = catchAsyncErrors(async (req, res, nex
       console.error("Failed to send return-resolution email:", error.message);
     }
 
-    res.status(200).json({ success: true, message: `Return request ${action === "Approve" ? "approved" : "rejected"}.` });
+    res.status(200).json({
+      success: true,
+      message: `Return request ${action === "Approve" ? "approved" : "rejected"}.`,
+      refundInitiated,
+      refundAmount: action === "Approve" && refundInitiated ? refundAmount : null,
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     return next(new ErrorHandler(error.message || "Failed to resolve return request.", error.statusCode || 500));
   } finally {
     client.release();
   }
+});
+
+export const retryReturnRefundByAdmin = catchAsyncErrors(async (req, res, next) => {
+  const { returnId } = req.params;
+
+  if (!isValidUUID(returnId)) {
+    return next(new ErrorHandler("Invalid return request ID.", 400));
+  }
+
+  const { rows } = await database.query(
+    `SELECT rr.id, rr.status, rr.refund_amount, oi.quantity, oi.price, oi.order_id, o.buyer_id,
+            p.name AS product_name, pay.payment_status, pay.razorpay_payment_id
+       FROM return_requests rr
+       JOIN order_items oi ON oi.id = rr.order_item_id
+       JOIN products p ON p.id = oi.product_id
+       JOIN orders o ON o.id = oi.order_id
+       LEFT JOIN payments pay ON pay.order_id = o.id
+      WHERE rr.id = $1 AND p.seller_id IS NULL`,
+    [returnId],
+  );
+
+  if (rows.length === 0) {
+    return next(new ErrorHandler("Return request not found.", 404));
+  }
+
+  const rr = rows[0];
+
+  if (rr.status !== "Approved") {
+    return next(new ErrorHandler("Only approved returns can be refunded.", 400));
+  }
+  if (rr.refund_amount) {
+    return next(new ErrorHandler("This return has already been refunded.", 400));
+  }
+  if (rr.payment_status !== "Paid" || !rr.razorpay_payment_id || rr.razorpay_payment_id.startsWith("pay_test")) {
+    return next(new ErrorHandler("There's nothing to refund for this order (unpaid or test payment).", 400));
+  }
+
+  const refundAmount = Number(rr.price) * rr.quantity;
+
+  let payment;
+  try {
+    payment = await razorpay.payments.fetch(rr.razorpay_payment_id);
+  } catch (error) {
+    return next(new ErrorHandler("Could not verify payment status with Razorpay.", 500));
+  }
+
+  const alreadyRefundedAmount = Number(payment.amount_refunded || 0) / 100;
+
+  if (alreadyRefundedAmount > 0) {
+    await database.query(`UPDATE return_requests SET refund_amount = $1 WHERE id = $2`, [alreadyRefundedAmount, returnId]);
+
+    await syncOrderPaymentStatusIfFullyRefunded(rr.order_id);
+
+    await createPersonalNotification({
+      userId: rr.buyer_id,
+      type: "return_refund_issued",
+      title: "Refund issued",
+      message: `A refund of ₹${alreadyRefundedAmount.toLocaleString("en-IN")} has been issued for your return of "${rr.product_name}".`,
+      linkEntityType: "order",
+      linkEntityId: rr.order_id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "This payment was already refunded — records have been updated to match.",
+      refundAmount: alreadyRefundedAmount,
+    });
+  }
+
+  try {
+    await razorpay.payments.refund(rr.razorpay_payment_id, {
+      amount: toPaise(refundAmount),
+      notes: { orderId: rr.order_id, returnId, initiatedBy: "admin-retry" },
+    });
+  } catch (error) {
+    console.error("Return refund retry failed:", error.error?.description || error.message);
+    return next(new ErrorHandler(error.error?.description || error.message || "Refund retry failed.", error.statusCode || 500));
+  }
+
+  await database.query(`UPDATE return_requests SET refund_amount = $1 WHERE id = $2`, [refundAmount, returnId]);
+
+  await syncOrderPaymentStatusIfFullyRefunded(rr.order_id);
+
+  await logAdminActivity({
+    adminId: req.user.id,
+    actionType: "return_refund_retried",
+    entityType: "return",
+    entityId: returnId,
+    details: { productName: rr.product_name, amount: refundAmount },
+  });
+
+  await createPersonalNotification({
+    userId: rr.buyer_id,
+    type: "return_refund_issued",
+    title: "Refund issued",
+    message: `A refund of ₹${refundAmount.toLocaleString("en-IN")} has been issued for your return of "${rr.product_name}".`,
+    linkEntityType: "order",
+    linkEntityId: rr.order_id,
+  });
+
+  res.status(200).json({ success: true, message: "Refund issued successfully.", refundAmount });
+});
+
+export const retryReturnRefundBySeller = catchAsyncErrors(async (req, res, next) => {
+  const sellerId = req.seller.id;
+  const { returnId } = req.params;
+
+  if (!isValidUUID(returnId)) {
+    return next(new ErrorHandler("Invalid return request ID.", 400));
+  }
+
+  const { rows } = await database.query(
+    `SELECT rr.id, rr.status, rr.refund_amount, oi.quantity, oi.price, oi.order_id, o.buyer_id,
+            p.name AS product_name, pay.payment_status, pay.razorpay_payment_id
+       FROM return_requests rr
+       JOIN order_items oi ON oi.id = rr.order_item_id
+       JOIN products p ON p.id = oi.product_id
+       JOIN orders o ON o.id = oi.order_id
+       LEFT JOIN payments pay ON pay.order_id = o.id
+      WHERE rr.id = $1 AND p.seller_id = $2`,
+    [returnId, sellerId],
+  );
+
+  if (rows.length === 0) {
+    return next(new ErrorHandler("Return request not found.", 404));
+  }
+
+  const rr = rows[0];
+
+  if (rr.status !== "Approved") {
+    return next(new ErrorHandler("Only approved returns can be refunded.", 400));
+  }
+  if (rr.refund_amount) {
+    return next(new ErrorHandler("This return has already been refunded.", 400));
+  }
+  if (rr.payment_status !== "Paid" || !rr.razorpay_payment_id || rr.razorpay_payment_id.startsWith("pay_test")) {
+    return next(new ErrorHandler("There's nothing to refund for this order (unpaid or test payment).", 400));
+  }
+
+  const refundAmount = Number(rr.price) * rr.quantity;
+
+  let payment;
+  try {
+    payment = await razorpay.payments.fetch(rr.razorpay_payment_id);
+  } catch (error) {
+    return next(new ErrorHandler("Could not verify payment status with Razorpay.", 500));
+  }
+
+  const alreadyRefundedAmount = Number(payment.amount_refunded || 0) / 100;
+
+  if (alreadyRefundedAmount > 0) {
+    await database.query(`UPDATE return_requests SET refund_amount = $1 WHERE id = $2`, [alreadyRefundedAmount, returnId]);
+
+    await syncOrderPaymentStatusIfFullyRefunded(rr.order_id);
+
+    await createPersonalNotification({
+      userId: rr.buyer_id,
+      type: "return_refund_issued",
+      title: "Refund issued",
+      message: `A refund of ₹${alreadyRefundedAmount.toLocaleString("en-IN")} has been issued for your return of "${rr.product_name}".`,
+      linkEntityType: "order",
+      linkEntityId: rr.order_id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "This payment was already refunded — records have been updated to match.",
+      refundAmount: alreadyRefundedAmount,
+    });
+  }
+
+  try {
+    await razorpay.payments.refund(rr.razorpay_payment_id, {
+      amount: toPaise(refundAmount),
+      notes: { orderId: rr.order_id, returnId, initiatedBy: "seller-retry" },
+    });
+  } catch (error) {
+    console.error("Return refund retry failed:", error.error?.description || error.message);
+    return next(new ErrorHandler(error.error?.description || error.message || "Refund retry failed.", error.statusCode || 500));
+  }
+
+  await database.query(`UPDATE return_requests SET refund_amount = $1 WHERE id = $2`, [refundAmount, returnId]);
+
+  await syncOrderPaymentStatusIfFullyRefunded(rr.order_id);
+
+  await createPersonalNotification({
+    userId: rr.buyer_id,
+    type: "return_refund_issued",
+    title: "Refund issued",
+    message: `A refund of ₹${refundAmount.toLocaleString("en-IN")} has been issued for your return of "${rr.product_name}".`,
+    linkEntityType: "order",
+    linkEntityId: rr.order_id,
+  });
+
+  res.status(200).json({ success: true, message: "Refund issued successfully.", refundAmount });
 });

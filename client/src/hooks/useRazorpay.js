@@ -81,7 +81,7 @@ const useRazorpay = () => {
             },
           },
           theme: {
-            color: '#4f46e5', // matches your indigo-600 accent
+            color: '#4f46e5', // matches your teal-600 accent
           },
         }
 

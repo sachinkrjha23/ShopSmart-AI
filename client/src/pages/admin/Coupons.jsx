@@ -9,7 +9,7 @@ import {
 import CouponModal from "../../components/admin/CouponModal";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
-import Loader from "../../components/ui/Loader";
+import TableSkeleton from '../../components/ui/TableSkeleton'
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import Tooltip from '../../components/ui/Tooltip'
 
@@ -175,9 +175,7 @@ const AdminCoupons = () => {
       </div>
 
       {loading && adminCoupons.length === 0 ? (
-        <div className="flex justify-center py-10">
-          <Loader />
-        </div>
+        <TableSkeleton columns={6} />
       ) : adminCoupons.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
           No coupons yet.
@@ -204,7 +202,7 @@ const AdminCoupons = () => {
                       <button
                         type="button"
                         onClick={() => handleCopyId(coupon.id)}
-                        className="text-xs text-gray-400 hover:text-indigo-600 transition-colors"
+                        className="text-xs text-gray-400 hover:text-teal-600 transition-colors"
                       >
                         #{coupon.id.slice(0, 8).toUpperCase()}
                       </button>
@@ -240,7 +238,7 @@ const AdminCoupons = () => {
                       <button
                         type="button"
                         onClick={() => handleEdit(coupon)}
-                        className="text-indigo-600 hover:underline"
+                        className="text-teal-600 hover:underline"
                       >
                         Edit
                       </button>

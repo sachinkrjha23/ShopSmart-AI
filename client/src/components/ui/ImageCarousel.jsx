@@ -137,7 +137,7 @@ const ImageCarousel = ({ images, onRemove, isEditMode = false }) => {
               onClick={() => goToSlide(index)}
               className={`relative flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
                 index === currentIndex
-                  ? 'border-indigo-500 ring-2 ring-indigo-200'
+                  ? 'border-teal-500 ring-2 ring-teal-200'
                   : 'border-gray-200 hover:border-gray-400'
               }`}
             >

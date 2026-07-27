@@ -7,7 +7,7 @@ const Breadcrumb = ({ items }) => {
         <span key={index} className="flex items-center gap-2">
           {index > 0 && <span>/</span>}
           {item.href ? (
-            <Link to={item.href} className="hover:text-indigo-600 transition-colors">
+            <Link to={item.href} className="hover:text-teal-600 transition-colors">
               {item.label}
             </Link>
           ) : (

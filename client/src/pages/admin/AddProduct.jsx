@@ -6,6 +6,7 @@ import { addProduct, fetchCategories } from "../../store/slices/productSlice";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import ImageCarousel from "../../components/ui/ImageCarousel";
+import AIDescriptionHelper from "../../components/product/AIDescriptionHelper";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_SIZE = 2 * 1024 * 1024;
@@ -131,18 +132,18 @@ const AddProduct = () => {
       />
 
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-gray-700">
-          Description <span className="text-red-500">*</span>
-        </label>
-        <textarea
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          disabled={loading}
-          rows={4}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200"
-        />
-      </div>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">Description <span className="text-red-500">*</span></label>
+            <AIDescriptionHelper
+              draft={formData.description}
+              productName={formData.name}
+              category={formData.category}
+              onGenerated={(text) => setFormData((prev) => ({ ...prev, description: text }))}
+              disabled={loading}
+            />
+          </div>
+          <textarea name="description" value={formData.description} onChange={handleChange} disabled={loading} rows={4} className="..." />
+        </div>
 
       <div className="grid grid-cols-2 gap-4">
         <Input
@@ -174,7 +175,7 @@ const AddProduct = () => {
           value={formData.category}
           onChange={handleChange}
           disabled={loading}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 bg-white"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200 bg-white"
         >
           <option value="">Select a category</option>
           {categories.map((cat) => (
@@ -200,7 +201,7 @@ const AddProduct = () => {
             disabled={loading}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
           />
-          <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all duration-200">
+          <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-50 text-teal-700 border border-teal-200 rounded-lg hover:bg-teal-100 hover:border-teal-300 transition-all duration-200">
             <svg
               className="w-4 h-4"
               fill="none"

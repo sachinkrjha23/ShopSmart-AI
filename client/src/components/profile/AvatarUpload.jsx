@@ -35,7 +35,7 @@ const AvatarUpload = ({ displayUrl, userName, onFileSelect, onRemove, disabled }
           className="h-20 w-20 rounded-full object-cover border border-gray-200"
         />
       ) : (
-        <div className="h-20 w-20 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-2xl font-semibold border border-gray-200">
+        <div className="h-20 w-20 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-2xl font-semibold border border-gray-200">
           {initials}
         </div>
       )}
@@ -46,7 +46,7 @@ const AvatarUpload = ({ displayUrl, userName, onFileSelect, onRemove, disabled }
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-sm font-medium text-teal-600 hover:text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {displayUrl ? 'Change photo' : 'Upload photo'}
           </button>

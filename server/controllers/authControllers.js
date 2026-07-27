@@ -37,7 +37,7 @@ export const register = catchAsyncErrors(async (req, res, next) => {
   }
   if (name.length < 3 || name.length > 50) {
     return next(
-      new ErrorHandler("Name must be between 2 and 50 characters.", 400),
+      new ErrorHandler("Name must be between 3 and 50 characters.", 400),
     );
   }
   if (!validator.isEmail(email)) {

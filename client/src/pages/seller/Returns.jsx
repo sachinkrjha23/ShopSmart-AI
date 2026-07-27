@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchSellerReturns, resolveSellerReturn } from "../../store/slices/returnSlice";
+import { fetchSellerReturns, resolveSellerReturn, retrySellerRefund } from "../../store/slices/returnSlice";
 import ReturnRequestList from "../../components/returns/ReturnRequestList";
 
 const SellerReturns = () => {
@@ -15,6 +15,9 @@ const SellerReturns = () => {
   const handleResolve = (returnId, action, admin_notes) =>
     dispatch(resolveSellerReturn({ returnId, action, admin_notes })).unwrap();
 
+  const handleRetryRefund = (returnId) =>
+    dispatch(retrySellerRefund(returnId)).unwrap();
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -27,6 +30,7 @@ const SellerReturns = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onResolve={handleResolve}
+        onRetryRefund={handleRetryRefund}
       />
     </div>
   );

@@ -23,12 +23,12 @@ const OrderTimeline = ({ status }) => {
             <div className="flex flex-col items-center gap-1">
               <div
                 className={`h-3 w-3 rounded-full ${
-                  isComplete ? 'bg-indigo-600' : 'bg-gray-200'
+                  isComplete ? 'bg-teal-600' : 'bg-gray-200'
                 }`}
               />
               <span
                 className={`text-xs whitespace-nowrap ${
-                  isComplete ? 'text-indigo-600 font-medium' : 'text-gray-400'
+                  isComplete ? 'text-teal-600 font-medium' : 'text-gray-400'
                 }`}
               >
                 {step}
@@ -37,7 +37,7 @@ const OrderTimeline = ({ status }) => {
             {!isLast && (
               <div
                 className={`flex-1 h-0.5 mx-2 ${
-                  index < currentIndex ? 'bg-indigo-600' : 'bg-gray-200'
+                  index < currentIndex ? 'bg-teal-600' : 'bg-gray-200'
                 }`}
               />
             )}

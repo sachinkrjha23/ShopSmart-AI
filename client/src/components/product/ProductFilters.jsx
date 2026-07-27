@@ -71,7 +71,7 @@ const ProductFilters = ({ onClose }) => {
         <h3 className="text-lg font-semibold text-gray-800">Filter Products</h3>
         <button
           onClick={handleResetFilters}
-          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+          className="text-sm text-teal-600 hover:text-teal-800 font-medium transition-colors"
         >
           Reset All
         </button>
@@ -86,7 +86,7 @@ const ProductFilters = ({ onClose }) => {
           name="category"
           value={localFilters.category}
           onChange={handleFilterChange}
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 bg-white"
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200 bg-white"
         >
           <option value="">All Categories</option>
           {categories.map((cat) => (
@@ -130,7 +130,7 @@ const ProductFilters = ({ onClose }) => {
           name="rating"
           value={localFilters.rating}
           onChange={handleFilterChange}
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 bg-white"
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200 bg-white"
         >
           <option value="">All Ratings</option>
           {ratings.map((r) => (
@@ -148,7 +148,7 @@ const ProductFilters = ({ onClose }) => {
           name="availability"
           value={localFilters.availability}
           onChange={handleFilterChange}
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 bg-white"
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200 bg-white"
         >
           <option value="">All Products</option>
           {availabilityOptions.map((o) => (

@@ -7,7 +7,7 @@ import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Pagination from '../../components/ui/Pagination'
-import Loader from '../../components/ui/Loader'
+import TableSkeleton from '../../components/ui/TableSkeleton'
 
 const SellerProducts = () => {
   const dispatch = useDispatch()
@@ -55,9 +55,7 @@ const SellerProducts = () => {
       </form>
 
       {loading && sellerProducts.length === 0 ? (
-        <div className="flex justify-center py-10">
-          <Loader />
-        </div>
+        <TableSkeleton columns={5} />
       ) : sellerProducts.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
           You haven't listed any products yet.
@@ -103,7 +101,7 @@ const SellerProducts = () => {
                     <div className="flex items-center justify-end gap-3">
                       <Link
                         to={`/seller/products/edit/${product.id}`}
-                        className="text-indigo-600 hover:underline"
+                        className="text-teal-600 hover:underline"
                       >
                         Edit
                       </Link>

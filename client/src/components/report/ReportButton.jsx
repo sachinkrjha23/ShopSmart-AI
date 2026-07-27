@@ -63,7 +63,7 @@ const ReportButton = ({ entityType, entityId, label = 'Report' }) => {
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-teal-500"
             >
               <option value="">Select a reason</option>
               {REASONS[entityType].map((r) => (
@@ -78,7 +78,7 @@ const ReportButton = ({ entityType, entityId, label = 'Report' }) => {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-none"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-teal-500 resize-none"
               placeholder="Anything that would help our team review this"
             />
           </div>

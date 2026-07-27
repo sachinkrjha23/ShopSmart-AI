@@ -5,7 +5,7 @@ import { toast } from "react-hot-toast";
 import { fetchProduct, clearSingleProduct } from "../store/slices/productSlice";
 import StarRating from "../components/ui/StarRating";
 import Breadcrumb from "../components/ui/Breadcrumb";
-import Loader from "../components/ui/Loader";
+import DetailPageSkeleton from "../components/ui/DetailPageSkeleton";
 import ReviewCard from "../components/product/ReviewCard";
 import useCart from "../hooks/useCart";
 import WishlistButton from "../components/wishlist/WishlistButton";
@@ -48,7 +48,7 @@ const ProductDetail = () => {
     }).format(price);
   };
 
-  if (loading) return <Loader fullScreen />;
+  if (loading) return <DetailPageSkeleton  />;
 
   if (!product) {
     return (
@@ -58,7 +58,7 @@ const ProductDetail = () => {
         </h2>
         <Link
           to="/products"
-          className="text-indigo-600 hover:underline text-sm"
+          className="text-teal-600 hover:underline text-sm"
         >
           Back to Products
         </Link>
@@ -107,7 +107,7 @@ const ProductDetail = () => {
 
             {/* Product Info */}
             <div className="flex flex-col gap-5">
-              <span className="text-xs font-medium text-indigo-500 uppercase tracking-wide">
+              <span className="text-xs font-medium text-teal-500 uppercase tracking-wide">
                 {product.category}
               </span>
 
@@ -123,7 +123,7 @@ const ProductDetail = () => {
                 </span>
               </div>
 
-              <div className="text-3xl font-bold text-indigo-600">
+              <div className="text-3xl font-bold text-teal-600">
                 {formatPrice(product.price)}
               </div>
 
@@ -154,7 +154,7 @@ const ProductDetail = () => {
                   Sold by{' '}
                   <Link
                     to={`/sellers/${product.seller_id}`}
-                    className="text-indigo-600 hover:underline font-medium"
+                    className="text-teal-600 hover:underline font-medium"
                   >
                     {product.seller_store_name}
                   </Link>
@@ -193,7 +193,7 @@ const ProductDetail = () => {
                   <button
                     onClick={handleAddToCart}
                     disabled={!isInStock}
-                    className="flex-1 bg-indigo-600 text-white text-sm font-medium py-3 rounded-xl hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    className="flex-1 bg-teal-600 text-white text-sm font-medium py-3 rounded-xl hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
                     {isInStock ? "Add to Cart" : "Out of Stock"}
                   </button>

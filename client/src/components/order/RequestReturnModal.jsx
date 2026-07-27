@@ -44,7 +44,7 @@ const RequestReturnModal = ({ isOpen, onClose, orderItemId, productTitle, onSucc
             placeholder="e.g. Item damaged, wrong size, not as described..."
             rows={4}
             disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 resize-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 resize-none"
           />
         </div>
 

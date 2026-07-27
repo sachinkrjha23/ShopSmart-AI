@@ -3,9 +3,14 @@ import ErrorHandler from "../middlewares/errorMiddleware.js";
 import { v2 as cloudinary } from "cloudinary";
 import database from "../database/db.js";
 import { getAIRecommendation } from "../utils/getAIRecommendation.js";
+import { generateProductDescription } from "../utils/generateProductDescription.js";
+import { logAdminActivity } from "../utils/adminActivityLogger.js";
+import { createPersonalNotification } from "./notificationControllers.js";
+
 const isValidUUID = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-import { logAdminActivity } from "../utils/adminActivityLogger.js";
+
+
 export const createProduct = catchAsyncErrors(async (req, res, next) => {
   const { name, description, price, category, stock } = req.body;
   const created_by = req.user.id;
@@ -302,19 +307,23 @@ export const fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
 
 export const updateProduct = catchAsyncErrors(async (req, res, next) => {
   const { productId } = req.params;
-  
   const { name, description, price, category, stock } = req.body || {};
 
-  // Check if product exists
-  const product = await database.query("SELECT * FROM products WHERE id = $1", [
-    productId,
-  ]);
+  const product = await database.query("SELECT * FROM products WHERE id = $1", [productId]);
 
   if (product.rows.length === 0) {
     return next(new ErrorHandler("Product not found.", 404));
   }
 
-  const allowedFields = ["name", "description", "price", "category", "stock"];
+  if (product.rows[0].seller_id) {
+    return next(
+      new ErrorHandler(
+        "This product belongs to a seller. Admins can deactivate a seller's listing but cannot edit its details.",
+        403,
+      ),
+    );
+  }
+
   const updates = [];
   const values = [];
   let index = 1;
@@ -444,20 +453,24 @@ export const updateProduct = catchAsyncErrors(async (req, res, next) => {
 
 export const deleteProduct = catchAsyncErrors(async (req, res, next) => {
   const { productId } = req.params;
+  const { reason } = req.body || {};
 
-  const product = await database.query("SELECT * FROM products WHERE id = $1", [
-    productId,
-  ]);
-
+  const product = await database.query("SELECT * FROM products WHERE id = $1", [productId]);
   if (product.rows.length === 0) {
     return next(new ErrorHandler("Product not found.", 404));
+  }
+
+  const targetProduct = product.rows[0];
+
+  // require a reason specifically when deactivating (not when reactivating) a seller's product
+  if (targetProduct.seller_id && targetProduct.is_active && !reason?.trim()) {
+    return next(new ErrorHandler("Please provide a reason for deactivating this seller's product.", 400));
   }
 
   const updated = await database.query(
     `UPDATE products SET is_active = NOT is_active WHERE id = $1 RETURNING *`,
     [productId],
   );
-
   const resultProduct = updated.rows[0];
 
   await logAdminActivity({
@@ -465,14 +478,31 @@ export const deleteProduct = catchAsyncErrors(async (req, res, next) => {
     actionType: resultProduct.is_active ? "product_reactivated" : "product_deactivated",
     entityType: "product",
     entityId: productId,
-    details: { name: resultProduct.name },
+    details: { name: resultProduct.name, reason: reason || null },
   });
 
+  if (targetProduct.seller_id && !resultProduct.is_active) {
+    const sellerResult = await database.query(
+      `SELECT user_id FROM sellers WHERE id = $1`,
+      [targetProduct.seller_id],
+    );
+
+    if (sellerResult.rows.length > 0) {
+      await createPersonalNotification({
+        userId: sellerResult.rows[0].user_id,
+        type: "product_deactivated_by_admin",
+        title: "A product was deactivated",
+        message: reason
+          ? `Your product "${resultProduct.name}" was deactivated by an admin. Reason: ${reason}`
+          : `Your product "${resultProduct.name}" was deactivated by an admin.`,
+        linkEntityType: "product",
+        linkEntityId: productId,
+      });
+    }
+  }
   res.status(200).json({
     success: true,
-    message: resultProduct.is_active
-      ? "Product reactivated successfully."
-      : "Product deactivated successfully.",
+    message: resultProduct.is_active ? "Product reactivated successfully." : "Product deactivated successfully.",
     product: resultProduct,
   });
 });
@@ -665,6 +695,301 @@ export const deleteReview = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
+const keywordFallbackSearch = async (userPrompt) => {
+  const filterKeywords = (query) => {
+    const stopWords = new Set([
+      "the",
+      "they",
+      "them",
+      "then",
+      "i",
+      "we",
+      "you",
+      "he",
+      "she",
+      "it",
+      "is",
+      "a",
+      "an",
+      "of",
+      "and",
+      "or",
+      "to",
+      "for",
+      "from",
+      "on",
+      "who",
+      "whom",
+      "why",
+      "when",
+      "which",
+      "with",
+      "this",
+      "that",
+      "in",
+      "at",
+      "by",
+      "be",
+      "not",
+      "was",
+      "were",
+      "has",
+      "have",
+      "had",
+      "do",
+      "does",
+      "did",
+      "so",
+      "some",
+      "any",
+      "how",
+      "can",
+      "could",
+      "should",
+      "would",
+      "there",
+      "here",
+      "just",
+      "than",
+      "because",
+      "but",
+      "its",
+      "it's",
+      "if",
+      "want",
+      "need",
+      "looking",
+      "get",
+      "buy",
+      "purchase",
+      "good",
+      "best",
+      "great",
+      "nice",
+      "perfect",
+      "ideal",
+    ]);
+
+    // ✅ Add synonym mapping for better search
+    const synonyms = {
+      smartphone: [
+        "phone",
+        "mobile",
+        "cell",
+        "android",
+        "iphone",
+        "samsung",
+        "oneplus",
+        "xiaomi",
+        "pixel",
+      ],
+      phone: ["smartphone", "mobile", "cell", "android", "iphone"],
+      laptop: [
+        "computer",
+        "notebook",
+        "macbook",
+        "dell",
+        "hp",
+        "lenovo",
+        "acer",
+        "asus",
+      ],
+      tv: [
+        "television",
+        "smart tv",
+        "led",
+        "oled",
+        "qled",
+        "samsung tv",
+        "sony tv",
+        "lg tv",
+      ],
+      headphones: [
+        "earphones",
+        "earbuds",
+        "headset",
+        "airpods",
+        "wireless earphones",
+        "neckband",
+      ],
+      speaker: [
+        "bluetooth speaker",
+        "soundbar",
+        "audio",
+        "jbl",
+        "sony",
+        "boAt",
+        "speakers",
+      ],
+      watch: [
+        "smartwatch",
+        "apple watch",
+        "samsung watch",
+        "fitness tracker",
+        "wearable",
+      ],
+      camera: [
+        "dslr",
+        "mirrorless",
+        "gopro",
+        "action camera",
+        "sony camera",
+        "canon",
+        "nikon",
+      ],
+      bag: [
+        "backpack",
+        "laptop bag",
+        "travel bag",
+        "sling bag",
+        "rucksack",
+        "school bag",
+      ],
+      shoe: [
+        "sneakers",
+        "running shoes",
+        "sports shoes",
+        "nike",
+        "adidas",
+        "puma",
+        "casual shoes",
+      ],
+      "t-shirt": [
+        "tshirt",
+        "t shirt",
+        "shirt",
+        "polo",
+        "casual shirt",
+        "round neck",
+      ],
+      jeans: ["denim", "pants", "trousers", "joggers", "cargo"],
+      jacket: [
+        "coat",
+        "winter jacket",
+        "leather jacket",
+        "hoodie",
+        "bomber jacket",
+      ],
+      book: ["books", "novel", "textbook", "reading", "storybook"],
+      furniture: [
+        "chair",
+        "table",
+        "desk",
+        "sofa",
+        "bed",
+        "cabinet",
+        "shelf",
+      ],
+      kitchen: [
+        "cookware",
+        "utensils",
+        "pots",
+        "pans",
+        "knives",
+        "cutting board",
+      ],
+      gaming: [
+        "game",
+        "controller",
+        "playstation",
+        "xbox",
+        "nintendo",
+        "pc gaming",
+      ],
+      drone: ["quadcopter", "dji", "aerial", "camera drone"],
+      charger: [
+        "charging",
+        "adapter",
+        "power bank",
+        "type c",
+        "usb",
+        "wireless charger",
+      ],
+      monitor: ["display", "screen", "computer monitor", "gaming monitor"],
+      keyboard: ["mechanical keyboard", "wireless keyboard", "keypad"],
+      mouse: ["wireless mouse", "gaming mouse", "computer mouse"],
+      printer: ["inkjet", "laser printer", "all-in-one", "label printer"],
+      router: ["wifi", "wireless router", "mesh network", "dual band"],
+      fridge: ["refrigerator", "freezer", "cooler", "mini fridge"],
+      "washing machine": [
+        "washer",
+        "laundry",
+        "washing machine",
+        "top load",
+        "front load",
+      ],
+      mixer: ["blender", "grinder", "food processor", "juicer"],
+      iron: ["steam iron", "clothes iron", "dry iron"],
+      vacuum: ["vacuum cleaner", "robot vacuum", "hoover", "cleaning"],
+      toaster: ["bread toaster", "griller", "sandwich maker"],
+      microwave: ["microwave oven", "convection microwave", "oven"],
+      purifier: ["air purifier", "water purifier", "filter", "RO"],
+      fan: ["ceiling fan", "table fan", "standing fan", "exhaust fan"],
+      ac: ["air conditioner", "window ac", "split ac", "inverter ac"],
+      heater: ["room heater", "space heater", "water heater", "geyser"],
+      bed: ["bed frame", "mattress", "bedsheet", "pillow"],
+      sofa: ["couch", "l-shaped sofa", "recliner", "sofa cum bed"],
+    };
+
+    // Clean and split the query
+    let words = query
+      .toLowerCase()
+      .replace(/[^\w\s]/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length > 1 && !stopWords.has(word));
+
+    // Expand with synonyms
+    const expandedWords = [...words];
+    for (const word of words) {
+      if (synonyms[word]) {
+        expandedWords.push(...synonyms[word]);
+      }
+      // Also check if any word is a synonym of something
+      for (const [key, syns] of Object.entries(synonyms)) {
+        if (syns.includes(word)) {
+          expandedWords.push(key);
+          break;
+        }
+      }
+    }
+
+    // Remove duplicates and return as SQL LIKE patterns
+    return [...new Set(expandedWords)]
+      .map((word) => `%${word}%`)
+      .slice(0, 15); // Allow more terms
+  };
+
+  const keywords = filterKeywords(userPrompt);
+
+  if (keywords.length === 0) {
+    return [];
+  }
+
+  console.log(`🔍 Keyword fallback search: ${keywords.join(", ")}`);
+
+  const result = await database.query(
+    `
+      SELECT * FROM products
+      WHERE (name ILIKE ANY($1)
+      OR description ILIKE ANY($1)
+      OR category ILIKE ANY($1))
+      AND stock > 0
+      ORDER BY 
+        CASE 
+          WHEN name ILIKE ANY($2) THEN 1
+          WHEN category ILIKE ANY($2) THEN 2
+          ELSE 3
+        END,
+        ratings DESC, 
+        created_at DESC
+      LIMIT 50;     
+      `,
+    [keywords, keywords],
+  );
+
+  return result.rows.slice(0, 10);
+};
+
 export const fetchAIFilteredProducts = catchAsyncErrors(
   async (req, res, next) => {
     const { userPrompt } = req.body;
@@ -675,305 +1000,17 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
       );
     }
 
-    const filterKeywords = (query) => {
-      const stopWords = new Set([
-        "the",
-        "they",
-        "them",
-        "then",
-        "i",
-        "we",
-        "you",
-        "he",
-        "she",
-        "it",
-        "is",
-        "a",
-        "an",
-        "of",
-        "and",
-        "or",
-        "to",
-        "for",
-        "from",
-        "on",
-        "who",
-        "whom",
-        "why",
-        "when",
-        "which",
-        "with",
-        "this",
-        "that",
-        "in",
-        "at",
-        "by",
-        "be",
-        "not",
-        "was",
-        "were",
-        "has",
-        "have",
-        "had",
-        "do",
-        "does",
-        "did",
-        "so",
-        "some",
-        "any",
-        "how",
-        "can",
-        "could",
-        "should",
-        "would",
-        "there",
-        "here",
-        "just",
-        "than",
-        "because",
-        "but",
-        "its",
-        "it's",
-        "if",
-        "want",
-        "need",
-        "looking",
-        "get",
-        "buy",
-        "purchase",
-        "good",
-        "best",
-        "great",
-        "nice",
-        "perfect",
-        "ideal",
-      ]);
-
-      // ✅ Add synonym mapping for better search
-      const synonyms = {
-        smartphone: [
-          "phone",
-          "mobile",
-          "cell",
-          "android",
-          "iphone",
-          "samsung",
-          "oneplus",
-          "xiaomi",
-          "pixel",
-        ],
-        phone: ["smartphone", "mobile", "cell", "android", "iphone"],
-        laptop: [
-          "computer",
-          "notebook",
-          "macbook",
-          "dell",
-          "hp",
-          "lenovo",
-          "acer",
-          "asus",
-        ],
-        tv: [
-          "television",
-          "smart tv",
-          "led",
-          "oled",
-          "qled",
-          "samsung tv",
-          "sony tv",
-          "lg tv",
-        ],
-        headphones: [
-          "earphones",
-          "earbuds",
-          "headset",
-          "airpods",
-          "wireless earphones",
-          "neckband",
-        ],
-        speaker: [
-          "bluetooth speaker",
-          "soundbar",
-          "audio",
-          "jbl",
-          "sony",
-          "boAt",
-          "speakers",
-        ],
-        watch: [
-          "smartwatch",
-          "apple watch",
-          "samsung watch",
-          "fitness tracker",
-          "wearable",
-        ],
-        camera: [
-          "dslr",
-          "mirrorless",
-          "gopro",
-          "action camera",
-          "sony camera",
-          "canon",
-          "nikon",
-        ],
-        bag: [
-          "backpack",
-          "laptop bag",
-          "travel bag",
-          "sling bag",
-          "rucksack",
-          "school bag",
-        ],
-        shoe: [
-          "sneakers",
-          "running shoes",
-          "sports shoes",
-          "nike",
-          "adidas",
-          "puma",
-          "casual shoes",
-        ],
-        "t-shirt": [
-          "tshirt",
-          "t shirt",
-          "shirt",
-          "polo",
-          "casual shirt",
-          "round neck",
-        ],
-        jeans: ["denim", "pants", "trousers", "joggers", "cargo"],
-        jacket: [
-          "coat",
-          "winter jacket",
-          "leather jacket",
-          "hoodie",
-          "bomber jacket",
-        ],
-        book: ["books", "novel", "textbook", "reading", "storybook"],
-        furniture: [
-          "chair",
-          "table",
-          "desk",
-          "sofa",
-          "bed",
-          "cabinet",
-          "shelf",
-        ],
-        kitchen: [
-          "cookware",
-          "utensils",
-          "pots",
-          "pans",
-          "knives",
-          "cutting board",
-        ],
-        gaming: [
-          "game",
-          "controller",
-          "playstation",
-          "xbox",
-          "nintendo",
-          "pc gaming",
-        ],
-        drone: ["quadcopter", "dji", "aerial", "camera drone"],
-        charger: [
-          "charging",
-          "adapter",
-          "power bank",
-          "type c",
-          "usb",
-          "wireless charger",
-        ],
-        monitor: ["display", "screen", "computer monitor", "gaming monitor"],
-        keyboard: ["mechanical keyboard", "wireless keyboard", "keypad"],
-        mouse: ["wireless mouse", "gaming mouse", "computer mouse"],
-        printer: ["inkjet", "laser printer", "all-in-one", "label printer"],
-        router: ["wifi", "wireless router", "mesh network", "dual band"],
-        fridge: ["refrigerator", "freezer", "cooler", "mini fridge"],
-        "washing machine": [
-          "washer",
-          "laundry",
-          "washing machine",
-          "top load",
-          "front load",
-        ],
-        mixer: ["blender", "grinder", "food processor", "juicer"],
-        iron: ["steam iron", "clothes iron", "dry iron"],
-        vacuum: ["vacuum cleaner", "robot vacuum", "hoover", "cleaning"],
-        toaster: ["bread toaster", "griller", "sandwich maker"],
-        microwave: ["microwave oven", "convection microwave", "oven"],
-        purifier: ["air purifier", "water purifier", "filter", "RO"],
-        fan: ["ceiling fan", "table fan", "standing fan", "exhaust fan"],
-        ac: ["air conditioner", "window ac", "split ac", "inverter ac"],
-        heater: ["room heater", "space heater", "water heater", "geyser"],
-        bed: ["bed frame", "mattress", "bedsheet", "pillow"],
-        sofa: ["couch", "l-shaped sofa", "recliner", "sofa cum bed"],
-      };
-
-      // Clean and split the query
-      let words = query
-        .toLowerCase()
-        .replace(/[^\w\s]/g, " ")
-        .split(/\s+/)
-        .filter((word) => word.length > 1 && !stopWords.has(word));
-
-      // Expand with synonyms
-      const expandedWords = [...words];
-      for (const word of words) {
-        if (synonyms[word]) {
-          expandedWords.push(...synonyms[word]);
-        }
-        // Also check if any word is a synonym of something
-        for (const [key, syns] of Object.entries(synonyms)) {
-          if (syns.includes(word)) {
-            expandedWords.push(key);
-            break;
-          }
-        }
-      }
-
-      // Remove duplicates and return as SQL LIKE patterns
-      return [...new Set(expandedWords)]
-        .map((word) => `%${word}%`)
-        .slice(0, 15); // Allow more terms
-    };
-
-    const keywords = filterKeywords(userPrompt);
-
-    if (keywords.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "No meaningful keywords found in your prompt.",
-        products: [],
-      });
-    }
-
-    console.log(`🔍 AI Search keywords: ${keywords.join(", ")}`);
-
-    // STEP 1: Basic SQL Filtering
-    const result = await database.query(
-      `
-        SELECT * FROM products
-        WHERE (name ILIKE ANY($1)
-        OR description ILIKE ANY($1)
-        OR category ILIKE ANY($1))
-        AND stock > 0
-        ORDER BY 
-          CASE 
-            WHEN name ILIKE ANY($2) THEN 1
-            WHEN category ILIKE ANY($2) THEN 2
-            ELSE 3
-          END,
-          ratings DESC, 
-          created_at DESC
-        LIMIT 50;     
-        `,
-      [keywords, keywords], // Passing keywords twice for the CASE statement
+    const catalogResult = await database.query(
+      `SELECT id, name, description, category, price, ratings, stock, images
+         FROM products
+        WHERE stock > 0
+        ORDER BY ratings DESC, created_at DESC
+        LIMIT 200`,
     );
 
-    const filteredProducts = result.rows;
+    const fullCatalog = catalogResult.rows;
 
-    if (filteredProducts.length === 0) {
+    if (fullCatalog.length === 0) {
       return res.status(200).json({
         success: true,
         message: "No products found matching your prompt.",
@@ -981,14 +1018,13 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
       });
     }
 
-    // STEP 2: AI FILTERING
     let finalProducts = [];
     let aiSuccess = false;
 
     try {
       const { success, products } = await getAIRecommendation(
         userPrompt,
-        filteredProducts,
+        fullCatalog,
       );
 
       aiSuccess = success;
@@ -996,12 +1032,12 @@ export const fetchAIFilteredProducts = catchAsyncErrors(
       if (success) {
         finalProducts = products;
       } else {
-        console.log("⚠️ AI failed, falling back to SQL results");
-        finalProducts = filteredProducts.slice(0, 10);
+        console.log("⚠️ AI failed, falling back to keyword search");
+        finalProducts = await keywordFallbackSearch(userPrompt);
       }
     } catch (error) {
       console.error("❌ AI crashed:", error.message);
-      finalProducts = filteredProducts.slice(0, 10);
+      finalProducts = await keywordFallbackSearch(userPrompt);
     }
 
     if (aiSuccess && finalProducts.length === 0) {
@@ -1254,4 +1290,42 @@ export const checkProductsAvailability = catchAsyncErrors(async (req, res, next)
     success: true,
     unavailable: [...unavailable, ...goneIds.map((id) => ({ id, name: null }))],
   });
+});
+
+export const aiPolishDescription = catchAsyncErrors(async (req, res, next) => {
+  const { draft, productName, category } = req.body;
+
+  if (!draft || !draft.trim()) {
+    return next(new ErrorHandler("Please write a rough draft first.", 400));
+  }
+  if (draft.trim().length < 10) {
+    return next(new ErrorHandler("Draft is too short to work with — add a bit more detail.", 400));
+  }
+
+  const isAdmin = req.user.role === "Admin";
+  let isSeller = false;
+
+  if (!isAdmin) {
+    const sellerCheck = await database.query(
+      `SELECT id FROM sellers WHERE user_id = $1 AND status = 'Approved'`,
+      [req.user.id],
+    );
+    isSeller = sellerCheck.rows.length > 0;
+  }
+
+  if (!isAdmin && !isSeller) {
+    return next(new ErrorHandler("Only admins and approved sellers can use this feature.", 403));
+  }
+
+  const result = await generateProductDescription({
+    draft: draft.trim(),
+    productName: productName?.trim(),
+    category: category?.trim(),
+  });
+
+  if (!result.success) {
+    return next(new ErrorHandler("AI description generation is temporarily unavailable. Please write it manually.", 502));
+  }
+
+  res.status(200).json({ success: true, description: result.description });
 });

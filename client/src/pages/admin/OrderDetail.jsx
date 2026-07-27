@@ -11,10 +11,12 @@ import {
 import OrderStatusBadge from "../../components/order/OrderStatusBadge";
 import OrderTimeline from "../../components/order/OrderTimeline";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
-import Loader from "../../components/ui/Loader";
+import DetailPageSkeleton from "../../components/ui/DetailPageSkeleton";
 import Tooltip from "../../components/ui/Tooltip";
 import { updateAdminItemFulfillmentStatus } from "../../store/slices/orderSlice";
+import { refundAdminOrder } from "../../store/slices/orderSlice";
 
 
 const PAYMENT_TAGS = {
@@ -47,6 +49,9 @@ const AdminOrderDetail = () => {
   } = useSelector((state) => state.order);
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refunding, setRefunding] = useState(false);
 
   useEffect(() => {
     dispatch(fetchAdminSingleOrder(id));
@@ -93,17 +98,31 @@ const AdminOrderDetail = () => {
     }
   };
 
+  const handleRefundConfirm = async () => {
+    const amount = Number(refundAmount);
+    if (!amount || amount <= 0) return toast.error("Enter a valid refund amount");
+    if (amount > Number(order.total_price)) return toast.error("Refund amount can't exceed the order total");
+
+    setRefunding(true);
+    try {
+      await dispatch(refundAdminOrder({ orderId: id, amount })).unwrap();
+      toast.success("Refund issued successfully.");
+      setRefundDialogOpen(false);
+      dispatch(fetchAdminSingleOrder(id));
+    } catch (err) {
+      toast.error(err || "Failed to issue refund");
+    } finally {
+      setRefunding(false);
+    }
+  };
+
   const handleCopyId = () => {
     navigator.clipboard.writeText(order.id);
     toast.success("Order ID copied to clipboard.");
   };
 
   if (loading && !order) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <Loader />
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!order) {
@@ -146,7 +165,7 @@ const AdminOrderDetail = () => {
               <button
                 type="button"
                 onClick={handleCopyId}
-                className="text-sm font-medium text-gray-800 hover:text-indigo-600 transition-colors"
+                className="text-sm font-medium text-gray-800 hover:text-teal-600 transition-colors"
               >
                 #{order.id.slice(0, 8).toUpperCase()}
               </button>
@@ -207,6 +226,21 @@ const AdminOrderDetail = () => {
         )}
       </div>
 
+      {!hasSellerItems && order.payment_status === "Paid" && (
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Refund</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Issue a refund directly to the buyer for this order. This does not cancel or change the order status.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => { setRefundAmount(String(order.total_price)); setRefundDialogOpen(true); }}
+          >
+            Issue Refund
+          </Button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-100 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Items</h2>
         <div className="flex flex-col gap-4">
@@ -234,7 +268,7 @@ const AdminOrderDetail = () => {
               <p className="text-sm font-medium text-gray-900">
                 ₹{(Number(item.price) * item.quantity).toLocaleString("en-IN")}
               </p>
-              {hasSellerItems && !item.sellerId && ITEM_NEXT_STATUS[item.fulfillmentStatus] && (
+              {!item.sellerId && ITEM_NEXT_STATUS[item.fulfillmentStatus] && (
                 <Button
                   onClick={() => handleAdvanceItemStatus(item)}
                   disabled={loading}
@@ -302,6 +336,36 @@ const AdminOrderDetail = () => {
         confirmLabel="Cancel Order"
         variant="danger"
       />
+
+      <Modal
+        isOpen={refundDialogOpen}
+        onClose={() => setRefundDialogOpen(false)}
+        title="Issue Refund"
+        size="sm"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-gray-600">
+            Full order total is ₹{Number(order.total_price).toLocaleString("en-IN")}. Adjust for a partial refund if needed.
+          </p>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Refund amount (₹)</label>
+            <input
+              type="number"
+              value={refundAmount}
+              onChange={(e) => setRefundAmount(e.target.value)}
+              min="1"
+              max={order.total_price}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-teal-500"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setRefundDialogOpen(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleRefundConfirm} disabled={refunding}>
+              {refunding ? "Processing..." : "Confirm Refund"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

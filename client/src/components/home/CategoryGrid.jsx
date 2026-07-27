@@ -76,14 +76,14 @@ const CategoryGrid = () => {
               <Link
                 key={category}
                 to={`/products?category=${encodeURIComponent(category)}`}
-                className="group flex flex-col items-center justify-center gap-4 p-6 bg-gray-50 rounded-2xl border border-gray-100 hover:border-indigo-200 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+                className="group flex flex-col items-center justify-center gap-4 p-6 bg-gray-50 rounded-2xl border border-gray-100 hover:border-teal-200 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
               >
-                <div className="w-14 h-14 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                <div className="w-14 h-14 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center group-hover:bg-teal-100 transition-colors">
                   <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     {categoryIcons[category.toLowerCase()] || defaultIcon}
                   </svg>
                 </div>
-                <span className="text-sm font-medium text-gray-700 group-hover:text-indigo-700 text-center">
+                <span className="text-sm font-medium text-gray-700 group-hover:text-teal-700 text-center">
                   {category}
                 </span>
               </Link>

@@ -7,7 +7,7 @@ import StarRating from '../../components/ui/StarRating'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Pagination from '../../components/ui/Pagination'
-import Loader from '../../components/ui/Loader'
+import TableSkeleton from '../../components/ui/TableSkeleton'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 
 const AdminReviews = () => {
@@ -54,9 +54,7 @@ const AdminReviews = () => {
       </form>
 
       {loading && adminReviews.length === 0 ? (
-        <div className="flex justify-center py-10">
-          <Loader />
-        </div>
+        <TableSkeleton columns={5} />
       ) : adminReviews.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
           No reviews found.
@@ -69,7 +67,7 @@ const AdminReviews = () => {
                 <div>
                   <Link
                     to={`/products/${review.product_id}`}
-                    className="text-sm font-semibold text-indigo-600 hover:underline"
+                    className="text-sm font-semibold text-teal-600 hover:underline"
                   >
                     {review.product_name}
                   </Link>

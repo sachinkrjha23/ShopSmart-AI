@@ -6,7 +6,8 @@ import OrderStatusBadge from '../../components/order/OrderStatusBadge'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Pagination from '../../components/ui/Pagination'
-import Loader from '../../components/ui/Loader'
+import TableSkeleton from '../../components/ui/TableSkeleton'
+
 
 const STATUS_OPTIONS = ['Processing', 'Shipped', 'Delivered', 'Cancelled']
 
@@ -53,7 +54,7 @@ const AdminOrders = () => {
         <select
           value={adminFilters.status}
           onChange={handleStatusChange}
-          className="px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 bg-white"
+          className="px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200 bg-white"
         >
           <option value="">All Statuses</option>
           {STATUS_OPTIONS.map((status) => (
@@ -63,9 +64,7 @@ const AdminOrders = () => {
       </div>
 
       {loading && adminOrders.length === 0 ? (
-        <div className="flex justify-center py-10">
-          <Loader />
-        </div>
+        <TableSkeleton columns={6} />
       ) : adminOrders.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
           No orders found.
@@ -111,7 +110,7 @@ const AdminOrders = () => {
                   <td className="px-4 py-3 text-right">
                     <Link
                       to={`/admin/orders/${order.id}`}
-                      className="text-indigo-600 hover:underline"
+                      className="text-teal-600 hover:underline"
                     >
                       View
                     </Link>

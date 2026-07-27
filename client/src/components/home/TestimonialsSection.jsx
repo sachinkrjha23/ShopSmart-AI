@@ -5,7 +5,7 @@ import { fetchTopReviews } from '../../store/slices/productSlice'
 import StarRating from '../ui/StarRating'
 
 const avatarColors = [
-  'bg-indigo-100 text-indigo-600',
+  'bg-teal-100 text-teal-600',
   'bg-purple-100 text-purple-600',
   'bg-pink-100 text-pink-600',
   'bg-amber-100 text-amber-600',

@@ -6,7 +6,7 @@ const isValidUUID = (id) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 const VALID_TARGET_AUDIENCES = ["buyers_and_sellers", "all_including_admins"];
-const VALID_LINK_ENTITY_TYPES = ["order", "return", "seller"];
+const VALID_LINK_ENTITY_TYPES = ["order", "return", "seller", "product"];
 
 export const createPersonalNotification = async ({
   userId,

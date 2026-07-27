@@ -12,6 +12,7 @@ import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import Loader from '../../components/ui/Loader'
 import ImageCarousel from '../../components/ui/ImageCarousel'
+import AIDescriptionHelper from "../../components/product/AIDescriptionHelper";
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const MAX_SIZE = 2 * 1024 * 1024
@@ -134,17 +135,17 @@ const EditProduct = () => {
         />
 
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">
-            Description <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            disabled={loading}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200"
-          />
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">Description <span className="text-red-500">*</span></label>
+            <AIDescriptionHelper
+              draft={formData.description}
+              productName={formData.name}
+              category={formData.category}
+              onGenerated={(text) => setFormData((prev) => ({ ...prev, description: text }))}
+              disabled={loading}
+            />
+          </div>
+          <textarea name="description" value={formData.description} onChange={handleChange} disabled={loading} rows={4} className="..." />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -177,7 +178,7 @@ const EditProduct = () => {
             value={formData.category}
             onChange={handleChange}
             disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 bg-white"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200 bg-white"
           >
             <option value="">Select a category</option>
             {categories.map((cat) => (
@@ -215,7 +216,7 @@ const EditProduct = () => {
               disabled={loading}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             />
-            <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-all duration-200">
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-50 text-teal-700 border border-teal-200 rounded-lg hover:bg-teal-100 hover:border-teal-300 transition-all duration-200">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>

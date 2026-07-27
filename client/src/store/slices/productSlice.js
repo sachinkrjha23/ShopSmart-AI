@@ -1,19 +1,8 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
-  getProducts,
-  getProduct,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  postReview,
-  deleteReview,
-  getAIRecommendations,
-  getCategories,
-  getTopReviews,
-  getAdminProducts,
-  getAdminSingleProduct,
-  getAdminReviews,
-  deleteAdminReview,
+  getProducts, getProduct, createProduct, updateProduct, deleteProduct, 
+  postReview, deleteReview, getAIRecommendations, getCategories, 
+  getTopReviews, getAdminProducts, getAdminSingleProduct, getAdminReviews, deleteAdminReview, polishProductDescription,
 } from "../../api/productApi";
 
 // ASYNC THUNKS
@@ -76,10 +65,10 @@ export const editProduct = createAsyncThunk(
 
 export const removeProduct = createAsyncThunk(
   'product/removeProduct',
-  async (id, { rejectWithValue }) => {
+  async ({ id, reason }, { rejectWithValue }) => {
     try {
-      const response = await deleteProduct(id)
-      return { id, ...response.data } // backend doesn't return id, so we pass it manually
+      const response = await deleteProduct(id, reason)
+      return { id, ...response.data }
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete product')
     }
@@ -212,6 +201,20 @@ export const fetchTopReviews = createAsyncThunk(
   },
 );
 
+export const polishDescription = createAsyncThunk(
+  "product/polishDescription",
+  async (data, { rejectWithValue }) => {
+    try {
+      const response = await polishProductDescription(data);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to generate description",
+      );
+    }
+  },
+);
+
 // INITIAL STATE
 
 const initialState = {
@@ -258,6 +261,7 @@ const initialState = {
   loading: false,
   error: null,
   aiLoading: false,
+  polishing: false,
 };
 
 // SLICE
@@ -518,6 +522,17 @@ const productSlice = createSlice({
       })
       .addCase(fetchTopReviews.rejected, (state, action) => {
         state.topReviewsLoading = false;
+      })
+
+      builder
+      .addCase(polishDescription.pending, (state) => {
+        state.polishing = true;
+      })
+      .addCase(polishDescription.fulfilled, (state) => {
+        state.polishing = false;
+      })
+      .addCase(polishDescription.rejected, (state) => {
+        state.polishing = false;
       });
   },
 });

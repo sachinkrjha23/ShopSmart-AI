@@ -4,13 +4,13 @@ const AddressCard = ({ address, onSetDefault, onEdit, onDelete, disabled }) => {
   return (
     <div
       className={`p-5 border rounded-xl bg-white ${
-        address.is_default ? 'border-indigo-300 ring-1 ring-indigo-100' : 'border-gray-200'
+        address.is_default ? 'border-teal-300 ring-1 ring-teal-100' : 'border-gray-200'
       }`}
     >
       <div className="flex items-center gap-2 mb-2">
         <span className="font-semibold text-gray-800">{address.full_name}</span>
         {address.is_default && (
-          <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">
+          <span className="text-xs bg-teal-100 text-teal-600 px-2 py-0.5 rounded-full">
             Default
           </span>
         )}
@@ -29,7 +29,7 @@ const AddressCard = ({ address, onSetDefault, onEdit, onDelete, disabled }) => {
             type="button"
             onClick={() => onSetDefault(address.id)}
             disabled={disabled}
-            className="text-indigo-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-teal-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Set as Default
           </button>

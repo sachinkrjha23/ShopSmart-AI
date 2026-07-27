@@ -1,6 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { createProduct , fetchAllProducts, updateProduct, deleteProduct, fetchSingleProduct, postProductReview, deleteReview , fetchAIFilteredProducts, getCategories, getTopReviews, adminGetAllProducts, adminGetSingleProduct, adminGetAllReviews, adminDeleteReview, checkProductsAvailability } from "../controllers/productControllers.js";
+import { createProduct , fetchAllProducts, updateProduct, deleteProduct, fetchSingleProduct, postProductReview, deleteReview , fetchAIFilteredProducts, getCategories, getTopReviews, adminGetAllProducts, adminGetSingleProduct, adminGetAllReviews, adminDeleteReview, checkProductsAvailability, aiPolishDescription } from "../controllers/productControllers.js";
 
 import { authorizedRoles, isAuthenticated} from "../middlewares/authMiddleware.js";
 
@@ -31,6 +31,8 @@ router.put("/post-new/review/:productId", isAuthenticated, postProductReview);
 router.delete("/delete/review/:productId", isAuthenticated, deleteReview);
 
 router.post("/ai/recommend", isAuthenticated, aiLimiter,  fetchAIFilteredProducts);
+
+router.post("/ai/polish-description", isAuthenticated, aiPolishDescription);
 
 router.get("/admin/all", isAuthenticated, authorizedRoles("Admin"), adminGetAllProducts);
 
