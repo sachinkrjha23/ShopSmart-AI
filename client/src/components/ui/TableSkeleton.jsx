@@ -1,7 +1,7 @@
 const TableSkeleton = ({ rows = 6, columns = 5 }) => {
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[640px] text-sm">
         <thead className="bg-gray-50">
           <tr>
             {[...Array(columns)].map((_, i) => (

@@ -15,8 +15,6 @@ const STATUS_VARIANTS = {
   Cancelled: 'danger',
 }
 
-// Mirrors the backend's FORWARD_TRANSITIONS in updateFulfillmentStatus —
-// keep these two in sync if that ever changes.
 const NEXT_STATUS = {
   Pending: 'Shipped',
   Shipped: 'Delivered',
@@ -142,8 +140,8 @@ const SellerOrderDetail = () => {
                   alt={item.title}
                   className="h-16 w-16 rounded-lg object-cover border border-gray-100"
                 />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">{item.title}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 break-words">{item.title}</p>
                   <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                 </div>
                 <div className="text-right">

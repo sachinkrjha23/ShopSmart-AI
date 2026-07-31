@@ -29,7 +29,11 @@ const formatDate = (date) =>
 const loadImageBuffer = async (url) => {
   if (!url || typeof url !== "string" || !url.startsWith("http")) return null;
   try {
-    const response = await fetch(url);
+    const jpegUrl = url.includes("res.cloudinary.com")
+      ? url.replace("/upload/", "/upload/f_jpg,q_auto/")
+      : url;
+
+    const response = await fetch(jpegUrl);   // ← fixed: use jpegUrl here
     if (!response.ok) return null;
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
@@ -41,8 +45,6 @@ const loadImageBuffer = async (url) => {
 export const generateInvoiceBuffer = async (order) => {
   const items = (order.items || []).filter(Boolean);
 
-  // Fetch all product images up front, in parallel — faster and more
-  // predictable than awaiting one-by-one inside the drawing loop.
   const imageBuffers = await Promise.all(
     items.map((item) => loadImageBuffer(item.image)),
   );

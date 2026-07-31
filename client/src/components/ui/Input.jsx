@@ -11,6 +11,7 @@ const Input = ({
   disabled = false,
   required = false,
   className = "",
+  ...rest
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
@@ -33,17 +34,18 @@ const Input = ({
           placeholder={placeholder}
           disabled={disabled}
           className={`w-full px-3 py-2 border rounded-lg text-sm outline-none transition-all duration-200
-            ${isPassword ? "pr-10" : ""}
-            ${error ? "border-red-500 focus:ring-red-300" : "border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200"}
-            ${disabled ? "bg-gray-100 cursor-not-allowed" : "bg-white"}
-            ${className}`}
+    ${isPassword ? "pr-10" : ""}
+    ${error ? "border-red-500 focus:ring-red-300" : "border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200"}
+    ${disabled ? "bg-gray-100 cursor-not-allowed" : "bg-white"}
+    ${className}`}
+          {...rest}
         />
         {isPassword && (
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
             tabIndex={-1}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? (

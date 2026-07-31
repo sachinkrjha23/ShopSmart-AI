@@ -27,7 +27,8 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
           <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            className="flex items-center justify-center h-11 w-11 -mr-2 text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            aria-label="Close"
           >
             &times;
           </button>

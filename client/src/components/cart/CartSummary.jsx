@@ -5,6 +5,7 @@ import useCart from '../../hooks/useCart'
 import { fetchSettings } from '../../store/slices/settingsSlice'
 import CouponInput from './CouponInput'
 import Button from '../ui/Button'
+import { closeCartDrawer } from '../../store/slices/uiSlice'
 
 const CartSummary = () => {
   const dispatch = useDispatch()
@@ -61,7 +62,7 @@ const CartSummary = () => {
         <span>{formatPrice(estimatedTotal)}</span>
       </div>
 
-      <Link to="/checkout" tabIndex={isEmpty ? -1 : 0}>
+      <Link to="/checkout" onClick={() => dispatch(closeCartDrawer())} tabIndex={isEmpty ? -1 : 0}>
         <Button fullWidth disabled={isEmpty} className="mt-4">
           Proceed to Checkout
         </Button>

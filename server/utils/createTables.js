@@ -38,11 +38,11 @@ export const createTables = async() =>{
         await createPaymentsTable();
         await createWishlistTable();
         await createAddressTable();
+        await createSellersTable();      
         await createCouponTables();
         await createPendingRegistrationsTable();
         await createStoreSettingsTable();
         await createContactMessagesTable();
-        await createSellersTable();
         await createSellerRatingsTable();
         await createNotificationTables();
         await createReturnRequestsTable();

@@ -48,7 +48,7 @@ const AISearchBar = () => {
   };
 
   return (
-    <section id="ai-search" className="py-16 sm:py-20 bg-gradient-to-b from-white to-gray-50">
+    <section id="ai-search" className="scroll-mt-16 py-16 sm:py-20 bg-gradient-to-b from-white to-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-teal-50 rounded-full px-4 py-1.5 mb-4">

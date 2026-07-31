@@ -203,8 +203,8 @@ const OrderDetail = () => {
                   alt={item.title}
                   className="h-16 w-16 rounded-lg object-cover border border-gray-100"
                 />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 break-words">
                     {item.title}
                   </p>
                   <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
@@ -237,7 +237,7 @@ const OrderDetail = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-col items-end gap-1 shrink-0">
                   <p className="text-sm font-medium text-gray-900">
                     ₹
                     {(Number(item.price) * item.quantity).toLocaleString(

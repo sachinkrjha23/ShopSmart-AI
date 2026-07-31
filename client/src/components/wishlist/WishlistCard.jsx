@@ -58,7 +58,7 @@ const WishlistCard = ({ item }) => {
         </div>
       </Link>
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         <Link to={`/products/${item.product_id}`}>
           <h3 className="text-sm font-medium text-gray-800 hover:text-teal-600 transition-colors line-clamp-2">
             {item.name}
@@ -87,7 +87,7 @@ const WishlistCard = ({ item }) => {
         </div>
       </div>
 
-      <div className="flex flex-col justify-between items-end gap-2">
+      <div className="flex flex-col justify-between items-end gap-2 shrink-0">
         <button
             type="button"
             onClick={handleRemove}
@@ -100,7 +100,7 @@ const WishlistCard = ({ item }) => {
           size="sm"
           onClick={handleAddToCart}
           disabled={!isInStock || isInCart(item.product_id)}
-          className="px-3 py-1.5 text-xs whitespace-nowrap"
+          className="px-3 py-1.5 !text-xs whitespace-nowrap"
         >
           {isInCart(item.product_id)
             ? "In Cart"

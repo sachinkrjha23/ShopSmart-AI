@@ -48,9 +48,9 @@ const NotificationInbox = () => {
               className={`p-4 rounded-xl border ${n.read_at ? 'bg-white border-gray-100' : 'bg-teal-50 border-teal-100'}`}
             >
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800">{n.title}</p>
-                  <p className="text-sm text-gray-600 mt-1">{n.message}</p>
+                  <p className="text-sm text-gray-600 mt-1 break-words">{n.message}</p>
                   <p className="text-xs text-gray-400 mt-2">
                     {new Date(n.created_at).toLocaleString('en-IN')}
                   </p>

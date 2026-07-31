@@ -142,7 +142,7 @@ const Reports = () => {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-gray-50 text-left text-gray-500">
               <tr>
                 <th className="px-4 py-3 font-medium">Entity</th>

@@ -1,18 +1,18 @@
-import { useSelector, useDispatch } from 'react-redux'
-import { Link } from 'react-router-dom'
-import { closeCartDrawer } from '../../store/slices/uiSlice'
-import CartItem from '../cart/CartItem'
-import CartSummary from '../cart/CartSummary'
-import Button from '../ui/Button'
+import { useSelector, useDispatch } from "react-redux";
+import { Link } from "react-router-dom";
+import { closeCartDrawer } from "../../store/slices/uiSlice";
+import CartItem from "../cart/CartItem";
+import CartSummary from "../cart/CartSummary";
+import Button from "../ui/Button";
 
 const CartDrawer = () => {
-  const dispatch = useDispatch()
-  const { isCartDrawerOpen } = useSelector((state) => state.ui)
-  const { items } = useSelector((state) => state.cart)
+  const dispatch = useDispatch();
+  const { isCartDrawerOpen } = useSelector((state) => state.ui);
+  const { items } = useSelector((state) => state.cart);
 
-  if (!isCartDrawerOpen) return null
+  if (!isCartDrawerOpen) return null;
 
-  const itemCount = items.reduce((acc, item) => acc + item.quantity, 0)
+  const itemCount = items.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -27,7 +27,7 @@ const CartDrawer = () => {
           </h2>
           <button
             onClick={() => dispatch(closeCartDrawer())}
-            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            className="flex items-center justify-center h-11 w-11 -mr-2 text-gray-400 hover:text-gray-600 text-2xl leading-none"
             aria-label="Close cart"
           >
             &times;
@@ -39,7 +39,9 @@ const CartDrawer = () => {
             <div className="h-full flex flex-col items-center justify-center gap-3 text-center py-10">
               <p className="text-gray-500 text-sm">Your cart is empty.</p>
               <Link to="/products" onClick={() => dispatch(closeCartDrawer())}>
-                <Button variant="primary" size="sm">Start Shopping</Button>
+                <Button variant="primary" size="sm">
+                  Start Shopping
+                </Button>
               </Link>
             </div>
           ) : (
@@ -59,7 +61,7 @@ const CartDrawer = () => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default CartDrawer
+export default CartDrawer;

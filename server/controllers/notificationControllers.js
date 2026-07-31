@@ -48,6 +48,10 @@ export const createBroadcastNotification = catchAsyncErrors(async (req, res, nex
     return next(new ErrorHandler("link_entity_id must be a valid UUID.", 400));
   }
 
+  if (expires_at && new Date(expires_at) <= new Date()) {
+    return next(new ErrorHandler("expires_at must be a future date/time.", 400));
+  }
+
   const query = expires_at
     ? `INSERT INTO notifications
          (scope, target_audience, type, title, message, link_entity_type, link_entity_id, created_by, expires_at)

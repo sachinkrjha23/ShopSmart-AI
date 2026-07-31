@@ -1,0 +1,13 @@
+process.env.NODE_ENV = "test";
+process.env.DB_NAME = "shopsmart_test";
+process.env.DB_USER = "postgres";
+process.env.DB_PASSWORD = "1234";
+process.env.DB_HOST = "localhost";
+process.env.DB_PORT = "5432";
+process.env.JWT_SECRET_KEY = "test_jwt_secret_do_not_use_in_prod";
+process.env.JWT_EXPIRES_IN = "7d";
+process.env.COOKIE_EXPIRES_IN = "7";
+process.env.PORT = "1920";
+process.env.RAZORPAY_SECRET_KEY = "test_razorpay_secret_key";
+process.env.RAZORPAY_FRONTEND_KEY = "test_razorpay_key_id";
+process.env.RAZORPAY_WEBHOOK_SECRET = "test_razorpay_webhook_secret";

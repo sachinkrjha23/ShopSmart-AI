@@ -46,6 +46,7 @@ import Coupons from "./pages/admin/Coupons";
 import Settings from "./pages/admin/Settings";
 import ActivityLog from "./pages/admin/ActivityLog";
 import Reports from "./pages/admin/Reports";
+import Broadcasts from "./pages/admin/Broadcasts";
 
 
 import Navbar from "./components/layout/Navbar";
@@ -109,6 +110,7 @@ const App = () => {
     <>
       <Toaster
         position="top-right"
+        containerStyle={{ top: 80 }}
         toastOptions={{
           duration: 3000,
         }}
@@ -188,6 +190,7 @@ const App = () => {
         <Route path="/admin/returns" element={<AdminRoute><AdminReturns /></AdminRoute>} />
         <Route path="/admin/activity-log" element={<AdminRoute><ActivityLog /></AdminRoute>} />
         <Route path="/admin/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+        <Route path="/admin/broadcasts" element={<AdminRoute><Broadcasts /></AdminRoute>} />
 
         {/* Seller */}
         <Route path="/become-seller" element={<PrivateRoute><BecomeSeller /></PrivateRoute>} />

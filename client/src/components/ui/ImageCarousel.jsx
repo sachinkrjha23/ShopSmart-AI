@@ -6,7 +6,6 @@ const ImageCarousel = ({ images, onRemove, isEditMode = false }) => {
   const [touchEndX, setTouchEndX] = useState(0);
   const containerRef = useRef(null);
 
-  // Handle swipe
   const handleTouchStart = (e) => {
     setTouchStartX(e.touches[0].clientX);
     setTouchEndX(e.touches[0].clientX);
@@ -18,16 +17,13 @@ const ImageCarousel = ({ images, onRemove, isEditMode = false }) => {
 
   const handleTouchEnd = () => {
     if (touchStartX - touchEndX > 50) {
-      // Swipe left - next image
       handleNext();
     }
     if (touchStartX - touchEndX < -50) {
-      // Swipe right - previous image
       handlePrev();
     }
   };
 
-  // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
       const tag = e.target.tagName;
@@ -39,7 +35,6 @@ const ImageCarousel = ({ images, onRemove, isEditMode = false }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, images.length]);
 
-  // Clamp currentIndex when images shrink (e.g. after removing the last image)
   useEffect(() => {
     if (images.length > 0 && currentIndex >= images.length) {
       setCurrentIndex(images.length - 1);
@@ -66,9 +61,12 @@ const ImageCarousel = ({ images, onRemove, isEditMode = false }) => {
     );
   }
 
+  // Guards against the render that happens right after `images` shrinks,
+  // before the clamping effect above has had a chance to run.
+  const safeIndex = currentIndex < images.length ? currentIndex : images.length - 1;
+
   return (
     <div className="relative group">
-      {/* Main Image Container */}
       <div
         ref={containerRef}
         className="relative h-64 md:h-80 lg:h-96 bg-gray-100 rounded-lg overflow-hidden"
@@ -76,18 +74,16 @@ const ImageCarousel = ({ images, onRemove, isEditMode = false }) => {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Image */}
         <img
-          src={images[currentIndex].url || images[currentIndex]}
-          alt={`Product ${currentIndex + 1}`}
+          src={images[safeIndex].url || images[safeIndex]}
+          alt={`Product ${safeIndex + 1}`}
           className="w-full h-full object-contain bg-white"
         />
 
-        {/* Remove Button (for edit mode) */}
         {isEditMode && onRemove && (
           <button
             type="button"
-            onClick={() => onRemove(currentIndex)}
+            onClick={() => onRemove(safeIndex)}
             className="absolute top-2 right-2 z-20 h-8 w-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,12 +92,10 @@ const ImageCarousel = ({ images, onRemove, isEditMode = false }) => {
           </button>
         )}
 
-        {/* Image Counter */}
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-black/70 text-white text-xs px-3 py-1 rounded-full">
-          {currentIndex + 1} / {images.length}
+          {safeIndex + 1} / {images.length}
         </div>
 
-        {/* Navigation Arrows - Desktop */}
         {images.length > 1 && (
           <>
             <button
@@ -124,19 +118,21 @@ const ImageCarousel = ({ images, onRemove, isEditMode = false }) => {
             </button>
           </>
         )}
-
       </div>
 
-      {/* Thumbnails */}
       {images.length > 1 && (
         <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
           {images.map((image, index) => (
-            <button
+            <div
               key={index}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => goToSlide(index)}
-              className={`relative flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
-                index === currentIndex
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') goToSlide(index);
+              }}
+              className={`relative flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200 cursor-pointer ${
+                index === safeIndex
                   ? 'border-teal-500 ring-2 ring-teal-200'
                   : 'border-gray-200 hover:border-gray-400'
               }`}
@@ -147,11 +143,21 @@ const ImageCarousel = ({ images, onRemove, isEditMode = false }) => {
                 className="w-full h-full object-cover"
               />
               {isEditMode && onRemove && (
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                  <span className="text-white text-xs">Remove</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(index);
+                  }}
+                  className="absolute top-1 right-1 z-10 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow"
+                  aria-label={`Remove image ${index + 1}`}
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               )}
-            </button>
+            </div>
           ))}
         </div>
       )}
