@@ -3,6 +3,8 @@ import { config } from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import fileUpload from "express-fileupload";
+import path from "path";                         
+import { fileURLToPath } from "url";              
 import {createTables} from "./utils/createTables.js";
 import { errorMiddleware } from "./middlewares/errorMiddleware.js";
 import  authRouter from "./router/authRoutes.js";
@@ -18,6 +20,9 @@ import sellerRouter from "./router/sellerRoutes.js";
 import notificationRouter from "./router/notificationRoutes.js";
 import returnRouter from "./router/returnRoutes.js";
 import reportRouter from "./router/reportRoutes.js";
+
+const __filename = fileURLToPath(import.meta.url); 
+const __dirname = path.dirname(__filename);       
 
 const app = express();
 
@@ -56,6 +61,11 @@ app.use("/api/v1/notification", notificationRouter);
 app.use("/api/v1/return", returnRouter);
 app.use("/api/v1/report", reportRouter);
 
+app.use(express.static(path.join(__dirname, "../client/dist")));
+
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+});
 
 await createTables();
 

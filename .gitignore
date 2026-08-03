@@ -29,3 +29,5 @@ build/
 
 # Frontend
 client/.env
+
+client/dist/

@@ -2,7 +2,6 @@ import pkg from "pg";
 const { Pool } = pkg;
 import dotenv from 'dotenv';
 
-// ✅ Load environment variables from config.env
 dotenv.config({ path: "./config/config.env" });
 
 const database = new Pool({
@@ -11,9 +10,10 @@ const database = new Pool({
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
-    max: 20,                    // ← NEW: max connections in pool
-    idleTimeoutMillis: 30000,   // ← NEW: close idle connections after 30s
-    connectionTimeoutMillis: 2000, // ← NEW: timeout if can't connect
+    max: 20,                   
+    idleTimeoutMillis: 30000,   
+    connectionTimeoutMillis: 2000, 
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
 
