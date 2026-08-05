@@ -42,7 +42,7 @@ A full-stack e-commerce platform with AI-powered product search, a multi-vendor 
 - Wishlist functionality
 - Multiple saved addresses
 - Coupon system (platform-wide and seller-scoped)
-- **Razorpay** payments with signature-verified webhooks
+- **Razorpay** payments with signature-verified webhooks **(configured in test/demo mode — no real money is processed)**
 
 ### 📦 Order Management
 - Full lifecycle tracking: **Processing → Shipped → Delivered**
@@ -83,7 +83,7 @@ A full-stack e-commerce platform with AI-powered product search, a multi-vendor 
 | **Authentication** | JWT (httpOnly cookies) + Google OAuth |
 | **Image Storage** | Cloudinary |
 | **AI** | Google Gemini API |
-| **Payments** | Razorpay (test mode) |
+| **Payments** | Razorpay (test/demo mode — no real transactions) |
 | **Testing** | Jest + Supertest (backend), Vitest + React Testing Library (frontend) |
 | **Hosting** | Render (single web service) + Supabase (managed PostgreSQL) |
 
@@ -533,6 +533,19 @@ Runs vite build to produce the static frontend (client/dist)
 Express serves the static frontend alongside the API from the same origin
 
 Why same-origin? This avoids cookie-related issues that arise when frontend and backend are on separate domains.
+
+---
+
+## 💳 Payment Notice
+
+**This is a demo project.** All payments are processed through Razorpay's **test mode** using mock card details. No real transactions are processed, and no actual money is charged.
+
+For testing payments, use Razorpay test card details:
+- **Card Number:** `4111 1111 1111 1111`
+- **Expiry:** Any future date
+- **CVV:** Any 3 digits
+- **OTP:** `1234` (or any 4 digits)
+
 
 ⚠️ Known Limitations
 Phone/OTP login — was shelved due to the absence of a free SMS provider at this project's stage.
