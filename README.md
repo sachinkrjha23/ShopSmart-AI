@@ -1,50 +1,123 @@
-ShopSmart AI
+# 🛍️ ShopSmart AI
+
 A full-stack e-commerce platform with AI-powered product search, a multi-vendor seller marketplace, and a complete admin/moderation system — built as a campus project.
 
-Live site: https://shopsmart-ai-z3cx.onrender.com
+[![Live Demo](https://img.shields.io/badge/Live-Demo-28a745?style=for-the-badge&logo=render&logoColor=white)](https://shopsmart-ai-z3cx.onrender.com)
+[![License](https://img.shields.io/badge/License-Educational-ff69b4?style=for-the-badge)](LICENSE)
 
-Overview
-ShopSmart AI is a PERN-stack (PostgreSQL, Express, React, Node) online store that goes beyond a basic shopping cart. Buyers can search products in plain English or Hinglish using Google Gemini, sellers can apply for and run their own storefronts within the platform, and admins have full moderation, reporting, and broadcast-notification tools.
+---
 
-Features
-Authentication — JWT (httpOnly cookies) + Google Sign-In (OAuth), with email verification via a pending-registration flow (accounts aren't created until the verification link is clicked)
+## 📋 Table of Contents
 
-AI-powered search — natural language / Hinglish product search using Google Gemini (gemini-2.5-flash)
+- [Overview](#overview)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Architecture Notes](#architecture-notes)
+- [Project Structure](#project-structure)
+- [Local Development Setup](#local-development-setup)
+- [Running Tests](#running-tests)
+- [Deployment](#deployment)
+- [Known Limitations](#known-limitations)
+- [License](#license)
 
-Shopping & checkout — per-user cart with stock-aware quantity caps, wishlist, multiple saved addresses, coupon system (platform-wide and seller-scoped), Razorpay payments with signature-verified webhooks
+---
 
-Orders — full lifecycle tracking (Processing → Shipped → Delivered), per-item cancellation and refunds, a 7-day return-request window
+## 🚀 Overview
 
-Multi-vendor marketplace — seller applications with admin approval/rejection (with cooldown periods for reapplying), seller-scoped coupons, seller ratings separate from product reviews
+**ShopSmart AI** is a **PERN-stack** (PostgreSQL, Express, React, Node) online store that goes beyond a basic shopping cart. Buyers can search products in **plain English or Hinglish** using Google Gemini, sellers can apply for and run their own storefronts within the platform, and admins have full moderation, reporting, and broadcast-notification tools.
 
-Reviews & ratings — product reviews gated on verified delivery; seller ratings are a single upsertable rating per buyer-seller pair, not per-order
+---
 
-Notifications — personal notifications (order updates, report resolutions) and admin broadcast announcements with audience targeting and expiry
+## ✨ Features
 
-Admin panel — dashboard stats, user/seller/product/report management, activity log, admin-secret-gated account deletion with a last-admin safety block
+### 🔐 Authentication
+- JWT-based authentication with **httpOnly cookies**
+- **Google Sign-In** (OAuth) integration
+- Email verification via **pending-registration flow** (accounts aren't created until the verification link is clicked)
 
-Invoices — PDF invoice generation and download per order
+### 🤖 AI-Powered Search
+- Natural language / Hinglish product search using **Google Gemini (gemini-2.5-flash)**
+- Intelligent product discovery beyond keyword matching
 
-Tech Stack
-Category	Tools
-Frontend	React + Vite + Tailwind CSS v4 + Redux Toolkit + React Router
-Backend	Node.js + Express + PostgreSQL (raw SQL via pg, no ORM)
-Auth	JWT (httpOnly cookies) + Google OAuth
-Image storage	Cloudinary
-AI	Google Gemini API
-Payments	Razorpay (test mode)
-Testing	Jest + Supertest (backend), Vitest + React Testing Library (frontend)
-Hosting	Render (single web service serving both API and built frontend) + Supabase (managed PostgreSQL)
-Architecture Notes
-The frontend and backend are deployed as a single Render web service rather than two separate services: Express serves the built React app (client/dist) as static files and handles all /api/v1/... routes on the same origin. This was a deliberate choice — hosting them on separate domains (even under the same provider, e.g. two different *.onrender.com subdomains) causes modern browsers to treat authentication cookies as third-party and block them, breaking login in production. Same-origin serving avoids this entirely without needing a custom domain or switching away from cookie-based auth.
+### 🛒 Shopping & Checkout
+- Per-user cart with **stock-aware quantity caps**
+- Wishlist functionality
+- Multiple saved addresses
+- Coupon system (platform-wide and seller-scoped)
+- **Razorpay** payments with signature-verified webhooks
 
-The database connection uses Supabase's Session Pooler (IPv4-compatible) rather than its direct connection, since Render's free tier and most home networks can't reach Supabase's IPv6-only direct connection endpoint.
+### 📦 Order Management
+- Full lifecycle tracking: **Processing → Shipped → Delivered**
+- Per-item cancellation and refunds
+- **7-day return-request window**
 
-Project Structure
-text
+### 🏪 Multi-Vendor Marketplace
+- Seller applications with admin approval/rejection
+- Cooldown periods for reapplying
+- Seller-scoped coupons
+- Seller ratings separate from product reviews
+
+### ⭐ Reviews & Ratings
+- Product reviews gated on **verified delivery**
+- Seller ratings are a single upsertable rating per buyer-seller pair (not per-order)
+
+### 🔔 Notifications
+- Personal notifications (order updates, report resolutions)
+- Admin broadcast announcements with **audience targeting** and expiry
+
+### 🛠️ Admin Panel
+- Dashboard stats
+- User/seller/product/report management
+- Activity log
+- Admin-secret-gated account deletion with a **last-admin safety block**
+
+### 📄 Invoices
+- PDF invoice generation and download per order
+
+---
+
+## 🧰 Tech Stack
+
+| Category | Tools |
+|----------|-------|
+| **Frontend** | React + Vite + Tailwind CSS v4 + Redux Toolkit + React Router |
+| **Backend** | Node.js + Express + PostgreSQL (raw SQL via `pg`, no ORM) |
+| **Authentication** | JWT (httpOnly cookies) + Google OAuth |
+| **Image Storage** | Cloudinary |
+| **AI** | Google Gemini API |
+| **Payments** | Razorpay (test mode) |
+| **Testing** | Jest + Supertest (backend), Vitest + React Testing Library (frontend) |
+| **Hosting** | Render (single web service) + Supabase (managed PostgreSQL) |
+
+---
+
+## 🏗️ Architecture Notes
+
+### Same-Origin Deployment Strategy
+
+The frontend and backend are deployed as a **single Render web service** rather than two separate services:
+
+- Express serves the built React app (`client/dist`) as static files
+- Handles all `/api/v1/...` routes on the same origin
+
+**Why this approach?**
+> Hosting them on separate domains (e.g., `frontend.onrender.com` and `backend.onrender.com`) causes modern browsers to treat authentication cookies as **third-party** and block them. Same-origin serving avoids this entirely without needing a custom domain or switching away from cookie-based auth.
+
+### Database Connectivity
+
+The database connection uses **Supabase's Session Pooler** (IPv4-compatible) rather than its direct connection, since Render's free tier and most home networks can't reach Supabase's IPv6-only direct connection endpoint.
+
+---
+
+## 📁 Project Structure
+
+<details>
+<summary><strong>Click to expand the full project structure</strong></summary>
+
+```bash
 ShopSmart-AI/
 ├── client/
-│   ├── .env                                    # Frontend environment variables
+│   ├── .env                                   
 │   ├── .oxlintrc.json                          # Oxlint configuration
 │   ├── index.html                              # HTML template
 │   ├── package-lock.json
@@ -270,8 +343,8 @@ ShopSmart-AI/
 │   ├── package.json
 │   ├── cloudflared.exe                          # Cloudflare tunnel executable (optional, for local testing)
 │   ├── config/
-│   │   └── config.env                         
-│   ├── controllers/                            
+│   │   └── config.env                           
+│   ├── controllers/                             
 │   │   ├── addressControllers.js
 │   │   ├── adminControllers.js
 │   │   ├── authControllers.js
@@ -339,8 +412,7 @@ ShopSmart-AI/
 │   │   ├── testSignature.js
 │   │   └── webhook.test.js
 │   ├── uploads/                                 # Temp file-upload staging (runtime generated, not tracked)
-│   │   ├── tmp-*.tmp
-│   │   └── ...
+│   │   └── tmp-*.tmp
 │   └── utils/
 │       ├── adminActivityLogger.js
 │       ├── anonymizeUser.js
@@ -360,13 +432,14 @@ ShopSmart-AI/
 ├── node_modules/                                # Dependencies (not tracked in Git, generated by npm install)
 │   └── ...
 │
-├── output/                                      # (Comment: Build output, temporary files, logs, or vague generated artifacts — not part of the source code)
+├── output/                                      # Build output, logs, or generated artifacts (not part of source)
 │   └── ...
 │
 └── README.md                                    # This file
-Local Development Setup
+</details>
+🛠️ Local Development Setup
 Prerequisites
-Node.js
+Node.js (v16 or higher)
 
 PostgreSQL (running locally)
 
@@ -380,13 +453,17 @@ Razorpay (test mode)
 
 Google OAuth
 
-An SMTP-capable email account (e.g. Gmail with an app password)
+An SMTP-capable email account (e.g., Gmail with an app password)
 
-Backend
+Backend Setup
+Navigate to the server directory:
+
 bash
 cd server
 npm install
-Create server/config/config.env with:
+Create environment configuration:
+
+Create server/config/config.env with the following variables:
 
 env
 PORT=1920
@@ -413,55 +490,56 @@ DB_HOST=localhost
 DB_NAME=your_local_db_name
 DB_PORT=5432
 GOOGLE_CLIENT_ID=your_google_oauth_client_id
-Run the server:
+Start the backend server:
 
 bash
 npm run dev
-Tables are created automatically on startup.
+Note: Database tables are created automatically on startup.
 
-Frontend
+Frontend Setup
+Navigate to the client directory:
+
 bash
 cd client
 npm install
+Create environment configuration:
+
 Create client/.env with:
 
 env
 VITE_BACKEND_URL=http://localhost:1920
 VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
-Run the dev server:
+Start the frontend dev server:
 
 bash
 npm run dev
 The app will be available at http://localhost:5173 (or the next available port).
 
-Running Tests
-Backend:
-
+🧪 Running Tests
+Backend Tests (Jest + Supertest)
 bash
 cd server
 npm test
-Frontend:
-
+Frontend Tests (Vitest + React Testing Library)
 bash
 cd client
 npm test
-Deployment
+🚀 Deployment
 Deployed on Render (single web service) with Supabase as the managed PostgreSQL database.
 
-The build process:
-
+Build Process
 Installs both client and server dependencies
 
 Runs vite build to produce the static frontend (client/dist)
 
 Express serves the static frontend alongside the API from the same origin
 
-This same-origin serving avoids cookie-related issues that arise when frontend and backend are on separate domains.
+Why same-origin? This avoids cookie-related issues that arise when frontend and backend are on separate domains.
 
-Known Limitations
-Phone/OTP login was shelved — no free SMS provider was available at this project's stage.
+⚠️ Known Limitations
+Phone/OTP login — was shelved due to the absence of a free SMS provider at this project's stage.
 
-Real device testing over a local network (phone hitting a dev-server IP) was blocked by a local firewall/network-profile issue and wasn't pursued further, since the production deployment (a public HTTPS URL) sidesteps the issue entirely.
+Local network testing — testing on physical mobile devices over the local network was blocked by firewall/network-profile restrictions. The production deployment (HTTPS-enabled public URL) sidesteps this issue entirely, and the team relied on responsive design tools in DevTools for mobile testing during development.
 
-License
+📄 License
 This project was built for educational purposes as a campus project.
