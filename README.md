@@ -2,9 +2,7 @@
 
 A full-stack e-commerce platform with AI-powered product search, a multi-vendor seller marketplace, and a complete admin/moderation system — built as a campus project.
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-28a745?style=for-the-badge&logo=render&logoColor=white)](https://shopsmart-ai-z3cx.onrender.com)
-[![License](https://img.shields.io/badge/License-Educational-ff69b4?style=for-the-badge)](LICENSE)
-
+**Live Demo:** [https://shopsmart-ai-z3cx.onrender.com](https://shopsmart-ai-z3cx.onrender.com)
 ---
 
 ## 📋 Table of Contents
