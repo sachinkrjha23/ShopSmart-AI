@@ -28,6 +28,29 @@ A full-stack e-commerce platform with AI-powered product search, a multi-vendor 
 
 ---
 
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><strong>Home Page</strong><br/><img src="screenshots/home.png" alt="Home page with AI search, categories, and new arrivals" /></td>
+    <td width="50%"><strong>AI Search Results</strong><br/><img src="screenshots/ai-search.png" alt="AI-powered search results for a query" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><strong>Checkout</strong><br/><img src="screenshots/checkout.png" alt="Checkout page with address selection and order review" /></td>
+    <td width="50%"><strong>Order Detail (Buyer View)</strong><br/><img src="screenshots/order-detail.png" alt="Buyer-facing order detail and tracking page" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><strong>Admin Dashboard</strong><br/><img src="screenshots/admin-dashboard.png" alt="Admin dashboard with revenue charts and top products" /></td>
+    <td width="50%"><strong>Admin — Orders</strong><br/><img src="screenshots/admin-orders.png" alt="Admin orders list" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><strong>Admin — Reports</strong><br/><img src="screenshots/admin-reports.png" alt="Admin reports management" /></td>
+    <td width="50%"><strong>Admin — Activity Log</strong><br/><img src="screenshots/admin-activity-log.png" alt="Admin activity log" /></td>
+  </tr>
+</table>
+
+---
+
 ## ✨ Features
 
 ### 🔐 Authentication
