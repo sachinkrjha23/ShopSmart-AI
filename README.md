@@ -3,6 +3,7 @@
 A full-stack e-commerce platform with AI-powered product search, a multi-vendor seller marketplace, and a complete admin/moderation system — built as a campus project.
 
 **Live Demo:** [https://shopsmart-ai-z3cx.onrender.com](https://shopsmart-ai-z3cx.onrender.com)
+
 ---
 
 ## 📋 Table of Contents
@@ -15,6 +16,7 @@ A full-stack e-commerce platform with AI-powered product search, a multi-vendor 
 - [Local Development Setup](#local-development-setup)
 - [Running Tests](#running-tests)
 - [Deployment](#deployment)
+- [Payment Notice](#payment-notice)
 - [Known Limitations](#known-limitations)
 - [License](#license)
 
@@ -31,10 +33,10 @@ A full-stack e-commerce platform with AI-powered product search, a multi-vendor 
 ### 🔐 Authentication
 - JWT-based authentication with **httpOnly cookies**
 - **Google Sign-In** (OAuth) integration
-- Email verification via **pending-registration flow** (accounts aren't created until the verification link is clicked)
+- Email verification via a **pending-registration flow** (accounts aren't created until the verification link is clicked)
 
 ### 🤖 AI-Powered Search
-- Natural language / Hinglish product search using **Google Gemini (gemini-2.5-flash)**
+- Natural language / Hinglish product search using **Google Gemini (`gemini-2.5-flash`)**
 - Intelligent product discovery beyond keyword matching
 
 ### 🛒 Shopping & Checkout
@@ -99,6 +101,7 @@ The frontend and backend are deployed as a **single Render web service** rather 
 - Handles all `/api/v1/...` routes on the same origin
 
 **Why this approach?**
+
 > Hosting them on separate domains (e.g., `frontend.onrender.com` and `backend.onrender.com`) causes modern browsers to treat authentication cookies as **third-party** and block them. Same-origin serving avoids this entirely without needing a custom domain or switching away from cookie-based auth.
 
 ### Database Connectivity
@@ -112,26 +115,18 @@ The database connection uses **Supabase's Session Pooler** (IPv4-compatible) rat
 <details>
 <summary><strong>Click to expand the full project structure</strong></summary>
 
-```bash
+```
 ShopSmart-AI/
 ├── client/
-│   ├── .env                                   
+│   ├── .env
 │   ├── .oxlintrc.json                          # Oxlint configuration
 │   ├── index.html                              # HTML template
-│   ├── package-lock.json
 │   ├── package.json
-│   ├── README.md
 │   ├── vite.config.js                          # Vite configuration
 │   ├── public/
 │   │   ├── favicon.svg
 │   │   ├── icons.svg
 │   │   └── logo.png
-│   ├── dist/                                   # Built frontend (generated at build time)
-│   │   ├── assets/
-│   │   │   ├── index-*.css
-│   │   │   ├── index-*.js
-│   │   │   └── logo-*.png
-│   │   └── index.html
 │   └── src/
 │       ├── api/                                # Axios calls per feature
 │       │   ├── addressApi.js
@@ -240,7 +235,7 @@ ShopSmart-AI/
 │       │   ├── useCart.js
 │       │   └── useRazorpay.js
 │       ├── lib/
-│       │   └── axios.js                         # Configured axios instance
+│       │   └── axios.js                        # Configured axios instance
 │       ├── pages/
 │       │   ├── About.jsx
 │       │   ├── Addresses.jsx
@@ -269,7 +264,7 @@ ShopSmart-AI/
 │       │   ├── UpdatePassword.jsx
 │       │   ├── VerifyEmail.jsx
 │       │   ├── VerifyEmailChange.jsx
-│       │   └── Wishlist.jsx
+│       │   ├── Wishlist.jsx
 │       │   ├── admin/
 │       │   │   ├── ActivityLog.jsx
 │       │   │   ├── AddProduct.jsx
@@ -320,7 +315,7 @@ ShopSmart-AI/
 │       │       ├── settingsSlice.js
 │       │       ├── uiSlice.js
 │       │       └── wishlistSlice.js
-│       ├── tests/                                # Vitest + RTL tests
+│       ├── tests/                              # Vitest + RTL tests
 │       │   ├── AdminRoute.test.jsx
 │       │   ├── authSlice.test.js
 │       │   ├── cartSlice.test.js
@@ -333,16 +328,14 @@ ShopSmart-AI/
 │       └── main.jsx
 │
 ├── server/
-│   ├── app.js                                   # Express app config, middleware, routes, static frontend serving
-│   ├── server.js                                # Entry point — starts the server, background intervals
+│   ├── app.js                                  # Express app config, middleware, routes, static frontend serving
+│   ├── server.js                               # Entry point — starts the server, background intervals
 │   ├── jest.config.js
 │   ├── jsconfig.json
-│   ├── package-lock.json
 │   ├── package.json
-│   ├── cloudflared.exe                          # Cloudflare tunnel executable (optional, for local testing)
 │   ├── config/
-│   │   └── config.env                           
-│   ├── controllers/                             
+│   │   └── config.env                          # Environment variables (not committed)
+│   ├── controllers/
 │   │   ├── addressControllers.js
 │   │   ├── adminControllers.js
 │   │   ├── authControllers.js
@@ -362,7 +355,7 @@ ShopSmart-AI/
 │   │   ├── authMiddleware.js
 │   │   ├── catchAsyncError.js
 │   │   └── errorMiddleware.js
-│   ├── models/                                  # Table-creation SQL, one file per table
+│   ├── models/                                 # Table-creation SQL, one file per table
 │   │   ├── addressTable.js
 │   │   ├── adminActivityLogTable.js
 │   │   ├── categoryTable.js
@@ -397,20 +390,16 @@ ShopSmart-AI/
 │   │   ├── sellerRoutes.js
 │   │   ├── settingsRoutes.js
 │   │   └── wishlistRoutes.js
-│   ├── tests/                                   # Jest + Supertest tests
+│   ├── tests/                                  # Jest + Supertest tests
 │   │   ├── auth.test.js
 │   │   ├── authorization.test.js
 │   │   ├── coupon.test.js
 │   │   ├── order.test.js
 │   │   ├── payment.test.js
-│   │   ├── readme.md
 │   │   ├── return.test.js
 │   │   ├── setupEnv.js
-│   │   ├── test.html
-│   │   ├── testSignature.js
 │   │   └── webhook.test.js
-│   ├── uploads/                                 # Temp file-upload staging (runtime generated, not tracked)
-│   │   └── tmp-*.tmp
+│   ├── uploads/                                # Temp file-upload staging (runtime generated, not tracked)
 │   └── utils/
 │       ├── adminActivityLogger.js
 │       ├── anonymizeUser.js
@@ -427,43 +416,33 @@ ShopSmart-AI/
 │       ├── passwordValidation.js
 │       └── sendEmail.js
 │
-├── node_modules/                                # Dependencies (not tracked in Git, generated by npm install)
-│   └── ...
-│
-├── output/                                      # Build output, logs, or generated artifacts (not part of source)
-│   └── ...
-│
-└── README.md                                    # This file
+└── README.md
+```
+
 </details>
-🛠️ Local Development Setup
-Prerequisites
-Node.js (v16 or higher)
 
-PostgreSQL (running locally)
+---
 
-Accounts/API keys for:
+## 🛠️ Local Development Setup
 
-Cloudinary
+### Prerequisites
 
-Google Gemini
+- Node.js (v16 or higher)
+- PostgreSQL (running locally)
+- Accounts/API keys for: Cloudinary, Google Gemini, Razorpay (test mode), Google OAuth, an SMTP-capable email account (e.g. Gmail with an app password)
 
-Razorpay (test mode)
+### Backend Setup
 
-Google OAuth
+1. Navigate to the server directory and install dependencies:
 
-An SMTP-capable email account (e.g., Gmail with an app password)
-
-Backend Setup
-Navigate to the server directory:
-
-bash
+```bash
 cd server
 npm install
-Create environment configuration:
+```
 
-Create server/config/config.env with the following variables:
+2. Create `server/config/config.env` with the following variables:
 
-env
+```env
 PORT=1920
 FRONTEND_URL=http://localhost:5173
 DASHBOARD_URL=http://localhost:5173
@@ -488,51 +467,70 @@ DB_HOST=localhost
 DB_NAME=your_local_db_name
 DB_PORT=5432
 GOOGLE_CLIENT_ID=your_google_oauth_client_id
-Start the backend server:
+```
 
-bash
+3. Start the backend server:
+
+```bash
 npm run dev
-Note: Database tables are created automatically on startup.
+```
 
-Frontend Setup
-Navigate to the client directory:
+> Database tables are created automatically on startup.
 
-bash
+### Frontend Setup
+
+1. Navigate to the client directory and install dependencies:
+
+```bash
 cd client
 npm install
-Create environment configuration:
+```
 
-Create client/.env with:
+2. Create `client/.env` with:
 
-env
+```env
 VITE_BACKEND_URL=http://localhost:1920
 VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
-Start the frontend dev server:
+```
 
-bash
+3. Start the frontend dev server:
+
+```bash
 npm run dev
-The app will be available at http://localhost:5173 (or the next available port).
+```
 
-🧪 Running Tests
-Backend Tests (Jest + Supertest)
-bash
+The app will be available at `http://localhost:5173` (or the next available port).
+
+---
+
+## 🧪 Running Tests
+
+**Backend (Jest + Supertest):**
+
+```bash
 cd server
 npm test
-Frontend Tests (Vitest + React Testing Library)
-bash
+```
+
+**Frontend (Vitest + React Testing Library):**
+
+```bash
 cd client
 npm test
-🚀 Deployment
-Deployed on Render (single web service) with Supabase as the managed PostgreSQL database.
+```
 
-Build Process
-Installs both client and server dependencies
+---
 
-Runs vite build to produce the static frontend (client/dist)
+## 🚀 Deployment
 
-Express serves the static frontend alongside the API from the same origin
+Deployed on **Render** (single web service) with **Supabase** as the managed PostgreSQL database.
 
-Why same-origin? This avoids cookie-related issues that arise when frontend and backend are on separate domains.
+**Build process:**
+1. Installs both `client` and `server` dependencies
+2. Runs `vite build` to produce the static frontend (`client/dist`)
+3. Express serves the static frontend alongside the API from the same origin
+
+**Why same-origin?** This avoids cookie-related issues that arise when frontend and backend are on separate domains — see [Architecture Notes](#architecture-notes) above.
 
 ---
 
@@ -540,17 +538,21 @@ Why same-origin? This avoids cookie-related issues that arise when frontend and 
 
 **This is a demo project.** All payments are processed through Razorpay's **test mode** using mock card details. No real transactions are processed, and no actual money is charged.
 
-For testing payments, use Razorpay test card details:
+For testing payments, use Razorpay's test card details:
 - **Card Number:** `4111 1111 1111 1111`
 - **Expiry:** Any future date
 - **CVV:** Any 3 digits
 - **OTP:** `1234` (or any 4 digits)
 
+---
 
-⚠️ Known Limitations
-Phone/OTP login — was shelved due to the absence of a free SMS provider at this project's stage.
+## ⚠️ Known Limitations
 
-Local network testing — testing on physical mobile devices over the local network was blocked by firewall/network-profile restrictions. The production deployment (HTTPS-enabled public URL) sidesteps this issue entirely, and the team relied on responsive design tools in DevTools for mobile testing during development.
+- **Phone/OTP login** — was shelved due to the absence of a free SMS provider at this project's stage.
+- **Local network testing** — testing on physical mobile devices over the local network was blocked by firewall/network-profile restrictions. The production deployment (HTTPS-enabled public URL) sidesteps this issue entirely; responsive design tools in DevTools were used for mobile testing during development instead.
 
-📄 License
+---
+
+## 📄 License
+
 This project was built for educational purposes as a campus project.
