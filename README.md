@@ -452,7 +452,7 @@ ShopSmart-AI/
 
 - Node.js (v16 or higher)
 - PostgreSQL (running locally)
-- Accounts/API keys for: Cloudinary, Google Gemini, Razorpay (test mode), Google OAuth, an SMTP-capable email account (e.g. Gmail with an app password)
+- Accounts/API keys for: Cloudinary, Google Gemini, Razorpay (test mode), Google OAuth, Brevo (free tier — used for transactional emails; requires a verified single sender)
 
 ### Backend Setup
 
@@ -472,11 +472,8 @@ DASHBOARD_URL=http://localhost:5173
 JWT_EXPIRES_IN=30d
 COOKIE_EXPIRES_IN=30
 JWT_SECRET_KEY=your_jwt_secret
-SMTP_SERVICE=gmail
-SMTP_MAIL=your_email@gmail.com
-SMTP_PASSWORD=your_app_password
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
+BREVO_API_KEY=your_brevo_api_key
+BREVO_FROM_EMAIL=your_verified_sender_email@gmail.com
 GEMINI_API_KEY=your_gemini_api_key
 CLOUDINARY_CLIENT_NAME=your_cloudinary_name
 CLOUDINARY_CLIENT_API=your_cloudinary_api_key
@@ -573,6 +570,7 @@ For testing payments, use Razorpay's test card details:
 
 - **Phone/OTP login** — was shelved due to the absence of a free SMS provider at this project's stage.
 - **Local network testing** — testing on physical mobile devices over the local network was blocked by firewall/network-profile restrictions. The production deployment (HTTPS-enabled public URL) sidesteps this issue entirely; responsive design tools in DevTools were used for mobile testing during development instead.
+- **Email delivery** — Render's free tier blocks outbound SMTP traffic entirely (a common anti-abuse restriction on free hosting tiers), so the app uses [Brevo](https://www.brevo.com)'s HTTP-based email API in production instead of traditional SMTP.
 
 ---
 
