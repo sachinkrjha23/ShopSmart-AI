@@ -76,15 +76,13 @@ export const register = catchAsyncErrors(async (req, res, next) => {
 
   const verifyUrl = `${frontendUrl}/verify-email/${verificationToken}`;
 
-  try {
-    await sendEmail({
-      email,
-      subject: "ShopSmart-AI - Verify Your Email",
-      message: `<p>Welcome to ShopSmart-AI! Please verify your email to complete registration:</p><a href="${verifyUrl}">${verifyUrl}</a><p>This link expires in 24 hours.</p>`,
-    });
-  } catch (error) {
+  sendEmail({
+    email,
+    subject: "ShopSmart-AI - Verify Your Email",
+    message: `<p>Welcome to ShopSmart-AI! Please verify your email to complete registration:</p><a href="${verifyUrl}">${verifyUrl}</a><p>This link expires in 24 hours.</p>`,
+  }).catch((error) => {
     console.error("Failed to send verification email:", error.message);
-  }
+  });
 
   res.status(201).json({
     success: true,
