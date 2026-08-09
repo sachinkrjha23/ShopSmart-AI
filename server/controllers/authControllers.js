@@ -214,10 +214,12 @@ export const resendVerification = catchAsyncErrors(async (req, res, next) => {
 
   const verifyUrl = `${frontendUrl}/verify-email/${verificationToken}`;
 
-  await sendEmail({
+  sendEmail({
     email,
     subject: "ShopSmart-AI - Verify Your Email",
     message: `<p>Please verify your email to complete registration:</p><a href="${verifyUrl}">${verifyUrl}</a><p>This link expires in 24 hours.</p>`,
+  }).catch((error) => {
+    console.error("Failed to resend verification email:", error.message);
   });
 
   res
