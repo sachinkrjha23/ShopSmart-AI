@@ -539,6 +539,17 @@ cd client
 npm test
 ```
 
+### Concurrency Verification (Optional)
+
+`server/concurrency-test.mjs` verifies that the checkout stock-decrement logic prevents overselling under concurrent load, by firing 200 simultaneous purchase attempts at a product with limited stock and confirming stock never goes negative.
+
+To run it: set a real product ID (from your local database) as `TEST_PRODUCT_ID` in `server/config/config.env`, then:
+
+```bash
+cd server
+node concurrency-test.mjs
+```
+
 ---
 
 ## 🚀 Deployment
