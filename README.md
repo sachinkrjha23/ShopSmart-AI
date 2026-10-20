@@ -4,21 +4,25 @@ A full-stack e-commerce platform with AI-powered product search, a multi-vendor 
 
 **Live Demo:** [https://shopsmart-ai-z3cx.onrender.com](https://shopsmart-ai-z3cx.onrender.com)
 
+> The demo runs on Render's free tier, so the first load after a period of inactivity can take around a minute.
+
 ---
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Architecture Notes](#architecture-notes)
-- [Project Structure](#project-structure)
-- [Local Development Setup](#local-development-setup)
-- [Running Tests](#running-tests)
-- [Deployment](#deployment)
-- [Payment Notice](#payment-notice)
-- [Known Limitations](#known-limitations)
-- [License](#license)
+- [Overview](#-overview)
+- [Screenshots](#-screenshots)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Architecture Notes](#️-architecture-notes)
+- [Key Design Decisions](#-key-design-decisions)
+- [Project Structure](#-project-structure)
+- [Local Development Setup](#️-local-development-setup)
+- [Running Tests](#-running-tests)
+- [Deployment](#-deployment)
+- [Payment Notice](#-payment-notice)
+- [Known Limitations](#️-known-limitations)
+- [License](#-license)
 
 ---
 
@@ -60,7 +64,7 @@ A full-stack e-commerce platform with AI-powered product search, a multi-vendor 
 
 ### 🤖 AI-Powered Search
 - Natural language / Hinglish product search using **Google Gemini (`gemini-2.5-flash`)**
-- Intelligent product discovery beyond keyword matching
+- Intelligent product discovery beyond keyword matching, with a keyword-search fallback if the AI call fails
 
 ### 🛒 Shopping & Checkout
 - Per-user cart with **stock-aware quantity caps**
@@ -71,8 +75,8 @@ A full-stack e-commerce platform with AI-powered product search, a multi-vendor 
 
 ### 📦 Order Management
 - Full lifecycle tracking: **Processing → Shipped → Delivered**
-- Per-item cancellation and refunds
-- **7-day return-request window**
+- Buyers can cancel an order while it is still **Processing**; sellers can cancel individual items; paid cancellations are refunded through Razorpay
+- Per-item return requests within a **7-day window** after delivery
 
 ### 🏪 Multi-Vendor Marketplace
 - Seller applications with admin approval/rejection
@@ -116,6 +120,33 @@ A full-stack e-commerce platform with AI-powered product search, a multi-vendor 
 
 ## 🏗️ Architecture Notes
 
+### System Architecture
+
+![ShopSmart AI system architecture](screenshots/system-architecture.png)
+
+One Express process serves both the built React app and the JSON API, so the browser only ever talks to a single origin.
+
+### Database ER Diagram
+
+![ShopSmart AI database ER diagram](screenshots/er-diagram.png)
+
+23 tables and 29 foreign keys. Click the image to enlarge.
+
+### Data Flow Diagram
+
+![ShopSmart AI data flow diagram (Level 1)](screenshots/data-flow-diagram.png)
+
+Level-1 view of how buyer, seller and admin requests move through the eight main processes, the data stores they read and write, and the external services they call. Click the image to enlarge.
+
+### Payment Flow
+
+1. The buyer clicks **Pay Now** and the client calls `POST /api/v1/payment/create-order`.
+2. The server re-validates prices, stock, coupon and tax inside a database transaction, creates the Razorpay order, and stores the order with a `Pending` payment.
+3. The client opens Razorpay Checkout and the buyer pays.
+4. The client sends the payment ID and signature to `POST /api/v1/payment/verify`, and the server recomputes the HMAC-SHA256 signature and compares it.
+5. In one transaction the server marks the payment `Paid`, decrements stock and records coupon use.
+6. Independently, Razorpay calls `POST /api/v1/payment/webhook` with a signed event. It runs the same guarded update, so stock is decremented only once even if both paths arrive.
+
 ### Same-Origin Deployment Strategy
 
 The frontend and backend are deployed as a **single Render web service** rather than two separate services:
@@ -130,6 +161,19 @@ The frontend and backend are deployed as a **single Render web service** rather 
 ### Database Connectivity
 
 The database connection uses **Supabase's Session Pooler** (IPv4-compatible) rather than its direct connection, since Render's free tier and most home networks can't reach Supabase's IPv6-only direct connection endpoint.
+
+Tables are created automatically on server startup (`server/utils/createTables.js`) — no separate migration step.
+
+---
+
+## 🎯 Key Design Decisions
+
+- **Server-authoritative checkout** — prices, stock, coupons and tax are re-validated server-side inside a database transaction; order items snapshot price, title and image so past orders stay accurate after a product changes.
+- **Atomic stock decrement** — `UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1` prevents overselling, verified by the concurrency test below.
+- **Race-proof constraints in the database** — partial unique indexes guarantee at most one pending return per order item and one pending report per reporter and target, even under concurrent requests.
+- **Two-path payment confirmation** — signature-checked browser callback plus signature-checked webhook, made idempotent so a payment can't be applied twice.
+- **AI is advisory only** — Gemini returns product IDs, which are matched against catalog data fetched from the database; it never supplies prices or product details. If the AI call fails, search falls back to keyword matching.
+- **Account deletion anonymizes** — the user row is kept (name, email, credentials and avatar are wiped) so order history stays intact for sellers.
 
 ---
 
@@ -353,6 +397,7 @@ ShopSmart-AI/
 ├── server/
 │   ├── app.js                                  # Express app config, middleware, routes, static frontend serving
 │   ├── server.js                               # Entry point — starts the server, background intervals
+│   ├── concurrency-test.mjs                    # Overselling check (see Running Tests)
 │   ├── jest.config.js
 │   ├── jsconfig.json
 │   ├── package.json
@@ -421,6 +466,7 @@ ShopSmart-AI/
 │   │   ├── payment.test.js
 │   │   ├── return.test.js
 │   │   ├── setupEnv.js
+│   │   ├── testSignature.js
 │   │   └── webhook.test.js
 │   ├── uploads/                                # Temp file-upload staging (runtime generated, not tracked)
 │   └── utils/
@@ -450,8 +496,8 @@ ShopSmart-AI/
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
-- PostgreSQL (running locally)
+- Node.js (v18 or higher)
+- PostgreSQL (v13 or higher, running locally)
 - Accounts/API keys for: Cloudinary, Google Gemini, Razorpay (test mode), Google OAuth, Brevo (free tier — used for transactional emails; requires a verified single sender)
 
 ### Backend Setup
@@ -497,6 +543,14 @@ npm run dev
 
 > Database tables are created automatically on startup.
 
+4. (Optional) **Get an admin account.** New accounts are regular users, so to try the admin panel (and approve seller applications), sign up in the app, then promote that account:
+
+```bash
+psql -U postgres -d your_local_db_name -c "UPDATE users SET role = 'Admin' WHERE email = 'your_email@example.com';"
+```
+
+> Email sign-up requires a working Brevo key to receive the verification link; Google Sign-In creates a verified account directly.
+
 ### Frontend Setup
 
 1. Navigate to the client directory and install dependencies:
@@ -521,11 +575,23 @@ npm run dev
 
 The app will be available at `http://localhost:5173` (or the next available port).
 
+> **Notes for local runs**
+> - Razorpay webhooks can't reach `localhost`, so locally a payment is confirmed through the browser callback only. To test webhooks, expose the server with a tunnel (e.g. ngrok) and register that URL in Razorpay.
+> - If `GEMINI_API_KEY` is missing or the Gemini call fails, search falls back to keyword matching.
+
 ---
 
 ## 🧪 Running Tests
 
 **Backend (Jest + Supertest):**
+
+The backend tests use their own database, configured in `server/tests/setupEnv.js` (`shopsmart_test` on `localhost:5432`, user `postgres`, password `1234`). Create it once — tables are created automatically when the app loads — or edit `setupEnv.js` to match your local credentials:
+
+```bash
+createdb -U postgres shopsmart_test
+```
+
+Then:
 
 ```bash
 cd server
@@ -543,12 +609,16 @@ npm test
 
 `server/concurrency-test.mjs` verifies that the checkout stock-decrement logic prevents overselling under concurrent load, by firing 200 simultaneous purchase attempts at a product with limited stock and confirming stock never goes negative.
 
+Example result from a local run: 12 units in stock, 200 simultaneous attempts → 12 succeeded, 188 correctly rejected, 0 oversold.
+
 To run it: set a real product ID (from your local database) as `TEST_PRODUCT_ID` in `server/config/config.env`, then:
 
 ```bash
 cd server
 node concurrency-test.mjs
 ```
+
+> The script really decrements that product's stock, so run it against a local database and a throwaway test product.
 
 ---
 
@@ -561,7 +631,7 @@ Deployed on **Render** (single web service) with **Supabase** as the managed Pos
 2. Runs `vite build` to produce the static frontend (`client/dist`)
 3. Express serves the static frontend alongside the API from the same origin
 
-**Why same-origin?** This avoids cookie-related issues that arise when frontend and backend are on separate domains — see [Architecture Notes](#architecture-notes) above.
+**Why same-origin?** This avoids cookie-related issues that arise when frontend and backend are on separate domains — see [Architecture Notes](#️-architecture-notes) above.
 
 ---
 
@@ -582,6 +652,10 @@ For testing payments, use Razorpay's test card details:
 - **Phone/OTP login** — was shelved due to the absence of a free SMS provider at this project's stage.
 - **Local network testing** — testing on physical mobile devices over the local network was blocked by firewall/network-profile restrictions. The production deployment (HTTPS-enabled public URL) sidesteps this issue entirely; responsive design tools in DevTools were used for mobile testing during development instead.
 - **Email delivery** — Render's free tier blocks outbound SMTP traffic entirely (a common anti-abuse restriction on free hosting tiers), so the app uses [Brevo](https://www.brevo.com)'s HTTP-based email API in production instead of traditional SMTP.
+- **No CSRF token** — cross-site requests are limited by CORS origin restrictions and JSON-only bodies, not a dedicated token.
+- **Client-side rendering only** — no SSR, so every product page shares one generic title and description for crawlers and link previews.
+- **Background jobs use `setInterval`** — stale-order cancellation and notification expiry run inside the single Node process and would need a real scheduler to work across multiple instances.
+- **AI search is capped** — each query sends up to 200 in-stock products to Gemini, which won't scale to very large catalogs.
 
 ---
 
