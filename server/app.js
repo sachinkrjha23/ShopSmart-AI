@@ -20,6 +20,7 @@ import sellerRouter from "./router/sellerRoutes.js";
 import notificationRouter from "./router/notificationRoutes.js";
 import returnRouter from "./router/returnRoutes.js";
 import reportRouter from "./router/reportRoutes.js";
+import database from "./database/db.js";
 
 const __filename = fileURLToPath(import.meta.url); 
 const __dirname = path.dirname(__filename);       
@@ -60,6 +61,15 @@ app.use("/api/v1/seller", sellerRouter);
 app.use("/api/v1/notification", notificationRouter);
 app.use("/api/v1/return", returnRouter);
 app.use("/api/v1/report", reportRouter);
+
+app.get("/health", async (req, res) => {
+  try {
+    await database.query("SELECT 1");
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    res.status(503).json({ ok: false });
+  }
+});
 
 app.use(express.static(path.join(__dirname, "../client/dist")));
 

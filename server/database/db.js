@@ -10,9 +10,10 @@ const database = new Pool({
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
-    max: 20,                   
-    idleTimeoutMillis: 30000,   
-    connectionTimeoutMillis: 2000, 
+    max: 20,
+    keepAlive: true,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
     ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
@@ -22,8 +23,7 @@ database.on('connect', () => {
 });
 
 database.on('error', (err) => {
-    console.error("❌ Database pool error:", err);
-    process.exit(1);
+    console.error("❌ Database pool error:", err.message);
 });
 
 export default database;

@@ -15,6 +15,15 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 import jwt from "jsonwebtoken";
 import { anonymizeUser } from "../utils/anonymizeUser.js";
 
+const getSafeFrontendUrl = (candidate) => {
+  const allowed = [process.env.FRONTEND_URL, process.env.DASHBOARD_URL]
+    .filter(Boolean)
+    .map((u) => u.replace(/\/$/, ""));
+  const cleaned =
+    typeof candidate === "string" ? candidate.replace(/\/$/, "") : "";
+  return allowed.includes(cleaned) ? cleaned : allowed[0];
+};
+
 const generateVerificationToken = () => {
   const verificationToken = crypto.randomBytes(20).toString("hex");
   const hashedToken = crypto
@@ -27,6 +36,7 @@ const generateVerificationToken = () => {
 
 export const register = catchAsyncErrors(async (req, res, next) => {
   const { name, email, password } = req.body;
+  const frontendUrl = getSafeFrontendUrl(req.query.frontendUrl);
   const { frontendUrl } = req.query;
 
   if (!name || !email || !password) {
@@ -172,7 +182,7 @@ export const verifyEmail = catchAsyncErrors(async (req, res, next) => {
 
 export const resendVerification = catchAsyncErrors(async (req, res, next) => {
   const { email } = req.body;
-  const { frontendUrl } = req.query;
+  const frontendUrl = getSafeFrontendUrl(req.query.frontendUrl);
 
   if (!email || !validator.isEmail(email)) {
     return next(new ErrorHandler("Please provide a valid email address.", 400));
@@ -371,7 +381,7 @@ export const logout = catchAsyncErrors(async (req, res, next) => {
 
 export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
   const { email } = req.body;
-  const { frontendUrl } = req.query;
+  const frontendUrl = getSafeFrontendUrl(req.query.frontendUrl);
 
   if (!email || !validator.isEmail(email)) {
     return next(new ErrorHandler("Please provide a valid email address.", 400));
@@ -525,7 +535,7 @@ export const updatePassword = catchAsyncErrors(async (req, res, next) => {
 
 export const updateProfile = catchAsyncErrors(async (req, res, next) => {
   const { name, email, removeAvatar } = req.body;
-  const { frontendUrl } = req.query;
+  const frontendUrl = getSafeFrontendUrl(req.query.frontendUrl);
 
   if (!req.user?.id) {
     return next(new ErrorHandler("User not authenticated.", 401));

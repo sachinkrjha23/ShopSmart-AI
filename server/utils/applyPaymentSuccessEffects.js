@@ -6,12 +6,17 @@ export async function applyPaymentSuccessEffects(client, orderId, buyerId) {
   );
 
   for (const item of items) {
-    await client.query(
+    const result = await client.query(
       `UPDATE products
        SET stock = stock - $1
        WHERE id = $2 AND stock >= $1`,
       [item.quantity, item.product_id],
     );
+    if (result.rowCount === 0) {
+      console.warn(
+        `Stock not decremented: order ${orderId}, product ${item.product_id}, qty ${item.quantity}`,
+      );
+    }
   }
 
   // Record coupon usage

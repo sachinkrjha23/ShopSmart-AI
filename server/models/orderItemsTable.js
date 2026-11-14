@@ -20,7 +20,13 @@ export async function createOrderItemTable() {
     await database.query(query);
     await database.query(
       `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS fulfillment_status TEXT NOT NULL DEFAULT 'Pending'
-      CHECK (fulfillment_status IN ('Pending', 'Shipped', 'Delivered'));`,
+      CHECK (fulfillment_status IN ('Pending', 'Shipped', 'Delivered', 'Cancelled'));`,
+    );
+    await database.query(
+      `ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_fulfillment_status_check;`,
+    );
+    await database.query(
+      `ALTER TABLE order_items ADD CONSTRAINT order_items_fulfillment_status_check CHECK (fulfillment_status IN ('Pending','Shipped','Delivered','Cancelled'));`,
     );
     await database.query(
       `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancellation_reason TEXT DEFAULT NULL;`,
