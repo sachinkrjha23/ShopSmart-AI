@@ -2,9 +2,9 @@
 
 A full-stack e-commerce platform with AI-powered product search, a multi-vendor seller marketplace, and a complete admin/moderation system.
 
-**Live Demo:** [https://shopsmart-ai-z3cx.onrender.com](https://shopsmart-ai-z3cx.onrender.com)
+**Live Demo:** [https://shopsmart-ai-oo00.onrender.com](https://shopsmart-ai-oo00.onrender.com)
 
-> The demo runs on Render's free tier, so the first load after a period of inactivity can take around a minute.
+> The demo runs on Render's free tier, so the first load after a period of inactivity can take around a minute. Payments use Razorpay test mode (see [Payment Notice](#-payment-notice)).
 
 ---
 
@@ -136,7 +136,7 @@ One Express process serves both the built React app and the JSON API, so the bro
 
 ![ShopSmart AI data flow diagram (Level 1)](screenshots/data-flow-diagram.png)
 
-Level-1 view of how buyer, seller and admin requests move through the eight main processes, the data stores they read and write, and the external services they call. Click the image to enlarge.
+Level-1 view: one card for each of the eight main processes, showing who sends what, which data stores it reads and writes, and which outside services it calls. The key at the bottom lists the tables in each store. Click the image to enlarge.
 
 ### Payment Flow
 
@@ -169,11 +169,12 @@ Tables are created automatically on server startup (`server/utils/createTables.j
 ## 🎯 Key Design Decisions
 
 - **Server-authoritative checkout** — prices, stock, coupons and tax are re-validated server-side inside a database transaction; order items snapshot price, title and image so past orders stay accurate after a product changes.
-- **Atomic stock decrement** — `UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1` prevents overselling, verified by the concurrency test below.
+- **Atomic stock decrement** — `UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1`, plus `CHECK (stock >= 0)`, means stock can never go negative, even under concurrent requests (see the concurrency test below).
 - **Race-proof constraints in the database** — partial unique indexes guarantee at most one pending return per order item and one pending report per reporter and target, even under concurrent requests.
 - **Two-path payment confirmation** — signature-checked browser callback plus signature-checked webhook, made idempotent so a payment can't be applied twice.
 - **AI is advisory only** — Gemini returns product IDs, which are matched against catalog data fetched from the database; it never supplies prices or product details. If the AI call fails, search falls back to keyword matching.
 - **Account deletion anonymizes** — the user row is kept (name, email, credentials and avatar are wiped) so order history stays intact for sellers.
+- **Safe email links** — verification, password-reset and email-change links are built only from the configured `FRONTEND_URL` / `DASHBOARD_URL`, never from a URL sent by the client, so a forged request can't point a reset email at another site.
 
 ---
 
@@ -395,9 +396,9 @@ ShopSmart-AI/
 │       └── main.jsx
 │
 ├── server/
-│   ├── app.js                                  # Express app config, middleware, routes, static frontend serving
+│   ├── app.js                                  # Express app config, middleware, routes, /health, static frontend serving
 │   ├── server.js                               # Entry point — starts the server, background intervals
-│   ├── concurrency-test.mjs                    # Overselling check (see Running Tests)
+│   ├── concurrency-test.mjs                    # Stock-decrement check (see Running Tests)
 │   ├── jest.config.js
 │   ├── jsconfig.json
 │   ├── package.json
@@ -607,9 +608,11 @@ npm test
 
 ### Concurrency Verification (Optional)
 
-`server/concurrency-test.mjs` verifies that the checkout stock-decrement logic prevents overselling under concurrent load, by firing 200 simultaneous purchase attempts at a product with limited stock and confirming stock never goes negative.
+`server/concurrency-test.mjs` runs the stock-decrement SQL directly against Postgres, with 200 simultaneous attempts on a product with limited stock, and confirms stock never goes negative.
 
-Example result from a local run: 12 units in stock, 200 simultaneous attempts → 12 succeeded, 188 correctly rejected, 0 oversold.
+Example result from a local run: 12 units in stock, 200 simultaneous attempts → 12 succeeded, 188 rejected, final stock 0.
+
+It tests the SQL statement itself, not the full HTTP and Razorpay checkout (see [Known Limitations](#️-known-limitations)).
 
 To run it: set a real product ID (from your local database) as `TEST_PRODUCT_ID` in `server/config/config.env`, then:
 
@@ -626,10 +629,19 @@ node concurrency-test.mjs
 
 Deployed on **Render** (single web service) with **Supabase** as the managed PostgreSQL database.
 
-**Build process:**
-1. Installs both `client` and `server` dependencies
-2. Runs `vite build` to produce the static frontend (`client/dist`)
-3. Express serves the static frontend alongside the API from the same origin
+**Render settings** (Root Directory empty, Free instance):
+
+- Build command: `cd client && npm install --include=dev && npm run build && cd ../server && npm install` (`--include=dev` is needed because Vite and Tailwind are dev dependencies and `NODE_ENV=production` skips them)
+- Start command: `cd server && npm start`
+- Set `NODE_ENV=production` and `NODE_VERSION=20`. Set `VITE_GOOGLE_CLIENT_ID` before the build, because Vite reads it at build time. Leave `VITE_BACKEND_URL` unset so the client uses its own origin.
+- Set `FRONTEND_URL` and `DASHBOARD_URL` to the service URL exactly, with no trailing slash (CORS and email links use them).
+
+**Other setup:**
+
+- **Supabase:** use the Session Pooler (port 5432, user `postgres.<project-ref>`), then enable Row-Level Security on all tables.
+- **Google Cloud Console:** add the service URL to Authorised JavaScript origins and publish the consent screen.
+- **Razorpay (test mode):** webhook URL `<url>/api/v1/payment/webhook` with its own secret; events `payment.captured`, `payment.failed` and `refund.processed`.
+- **Health check:** `GET /health` runs `SELECT 1` and returns `{"ok":true}`. It can be pinged (for example from cron-job.org every 10 minutes) to keep the free instance awake. Render's free hours are shared per workspace, so this is best done only while the demo is in use.
 
 **Why same-origin?** This avoids cookie-related issues that arise when frontend and backend are on separate domains — see [Architecture Notes](#️-architecture-notes) above.
 
@@ -652,10 +664,12 @@ For testing payments, use Razorpay's test card details:
 - **Phone/OTP login** — was shelved due to the absence of a free SMS provider at this project's stage.
 - **Local network testing** — testing on physical mobile devices over the local network was blocked by firewall/network-profile restrictions. The production deployment (HTTPS-enabled public URL) sidesteps this issue entirely; responsive design tools in DevTools were used for mobile testing during development instead.
 - **Email delivery** — Render's free tier blocks outbound SMTP traffic entirely (a common anti-abuse restriction on free hosting tiers), so the app uses [Brevo](https://www.brevo.com)'s HTTP-based email API in production instead of traditional SMTP.
-- **No CSRF token** — cross-site requests are limited by CORS origin restrictions and JSON-only bodies, not a dedicated token.
+- **No CSRF token** — cross-site requests are limited by a CORS allow-list, JSON-only bodies and `SameSite=Lax` cookies, not a dedicated token.
+- **Stock vs. paid orders** — stock can never go negative, but if two buyers pay for the last unit, the second order still completes as paid and there is no automatic refund. The server only logs a warning.
 - **Client-side rendering only** — no SSR, so every product page shares one generic title and description for crawlers and link previews.
-- **Background jobs use `setInterval`** — stale-order cancellation and notification expiry run inside the single Node process and would need a real scheduler to work across multiple instances.
+- **Background jobs use `setInterval`** — stale-order cancellation and notification expiry run inside the single Node process and would need a real scheduler to work across multiple instances. Rate-limit counters are also in memory and reset on restart.
 - **AI search is capped** — each query sends up to 200 in-stock products to Gemini, which won't scale to very large catalogs.
+- **Schema changes run on every boot** — tables are created and altered with `IF NOT EXISTS` statements, so there is no migration history or rollback.
 
 ---
 
