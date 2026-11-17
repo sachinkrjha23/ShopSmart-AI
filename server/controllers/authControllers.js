@@ -37,7 +37,6 @@ const generateVerificationToken = () => {
 export const register = catchAsyncErrors(async (req, res, next) => {
   const { name, email, password } = req.body;
   const frontendUrl = getSafeFrontendUrl(req.query.frontendUrl);
-  const { frontendUrl } = req.query;
 
   if (!name || !email || !password) {
     return next(new ErrorHandler("Please provide all required fields.", 400));
